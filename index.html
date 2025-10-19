@@ -15,12 +15,12 @@
     :root{
       --ink:#000;
       --paper:#fff;
-      --stack:680px;          /* page column */
-      --top:64px;             /* top margin */
-      --hero-size:340px;      /* large image */
-      --afterhead-push:24px;  /* vertical gap below location (bio up) */
-      --footer-up:40px;       /* raise emails from bottom */
-      --content-shift-left:28px; /* move body content further left */
+      --stack:680px;           /* page column width */
+      --top:64px;              /* top margin */
+      --hero-size:340px;       /* image width */
+      --afterhead-push:72px;   /* push bio + articles DOWN */
+      --footer-up:40px;        /* raise emails from bottom */
+      --content-shift-left:28px; /* nudge content (not hero/name/loc/emails) left */
     }
 
     *{box-sizing:border-box;margin:0;padding:0}
@@ -32,46 +32,57 @@
     }
     main{
       max-width:var(--stack);
-      margin:var(--top) auto 120px;
+      margin:var(--top) auto 140px; /* extra bottom to avoid footer overlap */
       padding:0 16px;
-      text-align:left;
+      text-align:left; /* default left */
     }
 
-    /* Only these three are centered */
-    #hero{display:block;margin:0 auto 12px;width:var(--hero-size);height:auto}
-    h1{font-weight:600;font-size:38px;letter-spacing:.2px;margin-bottom:6px;text-align:center}
-    .loc{font-size:18px;opacity:.85;margin-bottom:6px;text-align:center}
+    /* Only these are centered */
+    #hero{
+      display:block; margin:0 auto 12px; width:var(--hero-size); height:auto;
+      max-width:90vw;
+    }
+    h1{
+      font-weight:600; font-size:48px; letter-spacing:.2px;
+      margin-bottom:6px; text-align:center;
+    }
+    .loc{
+      font-size:22px; opacity:.9; margin-bottom:6px; text-align:center;
+    }
 
     /* Everything after location */
     .afterhead{margin-top:var(--afterhead-push)}
     .content{margin-left:calc(-1 * var(--content-shift-left))}
 
-    /* Bio: two lines, no extra margin between lines */
-    .bio{font-size:20px;margin:0 0 28px}
-    .bio-line{display:block;margin:0}
+    /* Bio: single line */
+    .bio{font-size:20px; margin:0 0 28px}
 
-    hr{border:none;border-top:1px solid currentColor;opacity:.25;width:100%;margin:22px 0 28px}
+    hr{
+      border:none; border-top:1px solid currentColor; opacity:.25;
+      width:100%; margin:22px 0 28px;
+    }
 
-    .pieces{display:grid;gap:22px;margin-top:4px}
-    .piece h2{font-size:22px;font-weight:600;margin-bottom:4px}
-    .piece .url{font-size:16px;opacity:.85;word-break:break-all}
+    .pieces{display:grid; gap:22px; margin-top:4px}
+    .piece h2{font-size:22px; font-weight:600; margin-bottom:4px}
+    .piece .url{font-size:16px; opacity:.85; word-break:break-all}
 
     /* Links: no underline until hover (includes emails) */
-    a{color:inherit;text-decoration:none}
+    a{color:inherit; text-decoration:none}
     a:hover{text-decoration:underline}
 
     /* Footer with dot perfectly centered */
     footer{
-      position:fixed;left:0;right:0;bottom:var(--footer-up);
+      position:fixed; left:0; right:0; bottom:var(--footer-up);
       font-size:16px;
     }
     .footwrap{
       max-width:var(--stack); margin:0 auto; padding:0 16px;
       display:grid; grid-template-columns:1fr auto 1fr; align-items:center;
+      text-align:center;
     }
-    .leftEmail{text-align:right}
-    .centerDot{text-align:center; opacity:.6; padding:0 10px}
-    .rightEmail{text-align:left}
+    .leftEmail{ text-align:right }
+    .centerDot{ text-align:center; opacity:.6; padding:0 10px }
+    .rightEmail{ text-align:left }
   </style>
 </head>
 <body>
@@ -82,8 +93,7 @@
 
     <div class="afterhead content">
       <p class="bio">
-        <span class="bio-line">I left Harvard at 20 to become xAI’s first Special Projects hire/lead.</span>
-        <span class="bio-line">Previously, I consulted for Polymarket.</span>
+        I left Harvard at 20 to become xAI’s first Special Projects hire/lead. Previously, I consulted for Polymarket.
       </p>
 
       <hr>
