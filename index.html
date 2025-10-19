@@ -4,8 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Eric Li</title>
-
-  <!-- Force light background -->
   <meta name="color-scheme" content="light">
 
   <!-- Cormorant Garamond -->
@@ -17,12 +15,14 @@
     :root{
       --ink:#000;
       --paper:#fff;
-      --stack:680px;
-      --top:64px;
-      --hero-size:220px;  /* image width */
-      --bio-push:28px;    /* push bio down */
-      --footer-up:40px;   /* raise emails from bottom */
+      --stack:680px;        /* page column */
+      --top:64px;           /* top margin */
+      --hero-size:340px;    /* MUCH larger image */
+      --afterhead-push:56px;/* shift everything after location down */
+      --footer-up:40px;     /* raise emails off the bottom */
+      --content-shift-left:28px; /* nudge main content further left */
     }
+
     *{box-sizing:border-box;margin:0;padding:0}
     html,body{height:100%}
     body{
@@ -32,9 +32,9 @@
     }
     main{
       max-width:var(--stack);
-      margin:var(--top) auto 96px;
+      margin:var(--top) auto 120px;
       padding:0 16px;
-      text-align:left;          /* left by default */
+      text-align:left;
     }
 
     /* Only these are centered */
@@ -42,53 +42,71 @@
     h1{font-weight:600;font-size:38px;letter-spacing:.2px;margin-bottom:6px;text-align:center}
     .loc{font-size:18px;opacity:.85;margin-bottom:6px;text-align:center}
 
-    .bio{font-size:20px;margin:var(--bio-push) 0 28px}
+    /* Everything after the location is pushed down and shifted left */
+    .afterhead{margin-top:var(--afterhead-push)}
+    .content{margin-left:calc(-1 * var(--content-shift-left))}
+
+    .bio{font-size:20px;margin:0 0 28px}
     hr{border:none;border-top:1px solid currentColor;opacity:.25;width:100%;margin:22px 0 28px}
 
     .pieces{display:grid;gap:22px;margin-top:4px}
-    .piece a{color:inherit;text-decoration:none;border-bottom:1px solid transparent}
-    .piece a:hover{border-bottom-color:currentColor}
     .piece h2{font-size:22px;font-weight:600;margin-bottom:4px}
-    .piece .url{font-size:16px;opacity:.8;word-break:break-all}
+    .piece .url{font-size:16px;opacity:.85;word-break:break-all}
+
+    /* Links: no underline until hover (includes emails) */
+    a{color:inherit;text-decoration:none}
+    a:hover{text-decoration:underline}
 
     footer{
       position:fixed;left:0;right:0;bottom:var(--footer-up);
-      font-size:16px;
+      font-size:16px;text-align:center;
     }
-    .footwrap{max-width:var(--stack);margin:0 auto;padding:0 16px;text-align:left}
-    footer a{color:inherit;text-decoration:none;border-bottom:1px solid currentColor}
+    .footwrap{max-width:var(--stack);margin:0 auto;padding:0 16px}
     footer .dot{margin:0 10px;opacity:.6}
   </style>
 </head>
 <body>
   <main>
     <img id="hero" src="IMG_0429.jpeg" alt="Eric Li" loading="eager" decoding="async">
-
     <h1>Eric Li</h1>
     <div class="loc">Palo Alto, CA</div>
 
-    <p class="bio">
-      I left Harvard at 20 to become xAI’s first Special Projects hire/lead. Previously, I consulted for Polymarket.
-    </p>
+    <div class="afterhead content">
+      <p class="bio">
+        I left Harvard at 20 to become xAI’s first Special Projects hire/lead. Previously, I consulted for Polymarket.
+      </p>
 
-    <hr>
+      <hr>
 
-    <section class="pieces" aria-label="Selected posts">
-      <article class="piece">
-        <h2><a href="https://x.com/ericli1_/status/1962105026052006032" target="_blank" rel="noopener">Everyone Wants to Trade Everything</a></h2>
-        <div class="url">x.com/ericli1_/status/1962105026052006032</div>
-      </article>
+      <section class="pieces" aria-label="Selected posts">
+        <article class="piece">
+          <h2>Everyone Wants to Trade Everything</h2>
+          <div class="url">
+            <a href="https://x.com/ericli1_/status/1962105026052006032" target="_blank" rel="noopener">
+              x.com/ericli1_/status/1962105026052006032
+            </a>
+          </div>
+        </article>
 
-      <article class="piece">
-        <h2><a href="https://x.com/ericli1_/status/1966220771501527203" target="_blank" rel="noopener">Do Prediction Markets Predict?</a></h2>
-        <div class="url">x.com/ericli1_/status/1966220771501527203</div>
-      </article>
+        <article class="piece">
+          <h2>Do Prediction Markets Predict?</h2>
+          <div class="url">
+            <a href="https://x.com/ericli1_/status/1966220771501527203" target="_blank" rel="noopener">
+              x.com/ericli1_/status/1966220771501527203
+            </a>
+          </div>
+        </article>
 
-      <article class="piece">
-        <h2><a href="https://x.com/ericli1_/status/1972784924374774125" target="_blank" rel="noopener">“If You Want Peace, You Must Prepare for War”</a></h2>
-        <div class="url">x.com/ericli1_/status/1972784924374774125</div>
-      </article>
-    </section>
+        <article class="piece">
+          <h2>“If You Want Peace, You Must Prepare for War”</h2>
+          <div class="url">
+            <a href="https://x.com/ericli1_/status/1972784924374774125" target="_blank" rel="noopener">
+              x.com/ericli1_/status/1972784924374774125
+            </a>
+          </div>
+        </article>
+      </section>
+    </div>
   </main>
 
   <footer>
