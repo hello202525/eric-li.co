@@ -15,14 +15,13 @@
     :root{
       --ink:#000;
       --paper:#fff;
-      --stack:680px;             /* page column width */
-      --top:64px;                /* top margin */
-      --hero-size:340px;         /* image width */
-      --afterhead-push:72px;     /* baseline gap below location (kept) */
-      --equal-gap:6px;           /* gap to match: h1↔loc and loc↔bio */
-      --below-push:24px;         /* push block below bio down a bit */
-      --footer-up:40px;          /* emails position */
-      --content-shift-left:28px; /* left nudge for body content */
+      --stack:680px;          /* page column width */
+      --top:64px;             /* top margin */
+      --hero-size:340px;      /* image width */
+      --equal-gap:12px;       /* SAME gap: Name↔Location and Location↔Bio (slightly bigger) */
+      --below-push:24px;      /* keeps HR + articles a bit lower */
+      --footer-up:40px;       /* emails position */
+      --content-shift-left:28px; /* nudge body content left */
     }
 
     *{box-sizing:border-box;margin:0;padding:0}
@@ -41,28 +40,13 @@
 
     /* Only these are centered */
     #hero{display:block;margin:0 auto 12px;width:var(--hero-size);height:auto;max-width:90vw}
-    h1{
-      font-weight:600;font-size:48px;letter-spacing:.2px;
-      margin-bottom:var(--equal-gap);text-align:center;
-    }
-    .loc{
-      font-size:22px;opacity:.9;
-      margin-bottom:var(--equal-gap);text-align:center;
-    }
+    h1{font-weight:600;font-size:48px;letter-spacing:.2px;margin-bottom:var(--equal-gap);text-align:center}
+    .loc{font-size:22px;opacity:.9;margin-bottom:var(--equal-gap);text-align:center}
 
-    /* Everything after the location */
-    .afterhead{margin-top:var(--afterhead-push)}
+    /* Content after location */
     .content{margin-left:calc(-1 * var(--content-shift-left))}
-
-    /* Bio: single line, lifted so loc↔bio gap == h1↔loc gap */
-    .bio{
-      font-size:20px;margin:0 0 28px;
-      position:relative;
-      top:calc(-1 * (var(--afterhead-push) - var(--equal-gap)));
-    }
-
-    /* Everything below the bio stays a bit lower */
-    .below-bio{margin-top:var(--below-push)}
+    .bio{font-size:20px;margin:0 0 28px}       /* single line; gap handled by .loc margin-bottom */
+    .below-bio{margin-top:var(--below-push)}   /* keep HR + articles lower */
 
     hr{border:none;border-top:1px solid currentColor;opacity:.25;width:100%;margin:22px 0 28px}
 
@@ -95,7 +79,7 @@
     <h1>Eric Li</h1>
     <div class="loc">Palo Alto, CA</div>
 
-    <div class="afterhead content">
+    <div class="content">
       <p class="bio">
         I left Harvard at 20 to become xAI’s first Special Projects hire/lead. Previously, I consulted for Polymarket.
       </p>
