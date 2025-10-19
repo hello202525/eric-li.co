@@ -4,7 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Eric Li</title>
-
   <meta name="color-scheme" content="light">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -16,13 +15,14 @@
       --ink:#000;
       --paper:#fff;
       --stack:680px;
-      --top:64px;
-      --hero-size:300px;   /* larger image */
-      --bio-size:19px;     /* tinge smaller */
-      --bio-push:28px;
-      --footer-up:40px;
-      --gap:12px;          /* space between dot and emails */
+      --u:8px;             /* base unit for consistent rhythm */
+      --top:8px;           /* reduced top to pull content up a touch */
+      --hero-size:320px;   /* a bit larger */
+      --bio-size:19px;     /* your “tinge smaller” */
+      --footer-up:32px;
+      --email-gap:10px;    /* tighter gap around the centered dot */
     }
+
     *{box-sizing:border-box;margin:0;padding:0}
     html,body{height:100%}
     body{
@@ -30,40 +30,47 @@
       font-family:'Cormorant Garamond',serif; line-height:1.5;
       -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
     }
+
     main{
       max-width:var(--stack);
-      margin:var(--top) auto 96px;
+      margin:calc(var(--top) + 6*var(--u)) auto calc(12*var(--u));
       padding:0 16px;
       text-align:left;
     }
 
-    /* Only these are centered */
-    #hero{display:block;margin:0 auto 12px;width:var(--hero-size);height:auto}
-    h1{font-weight:600;font-size:38px;letter-spacing:.2px;margin-bottom:6px;text-align:center}
-    .loc{font-size:18px;opacity:.85;margin-bottom:6px;text-align:center}
+    /* Masthead block is centered for cohesion */
+    .masthead{ text-align:center; }
+    #hero{display:block;margin:0 auto calc(1.5*var(--u));width:var(--hero-size);height:auto}
+    h1{font-weight:600;font-size:38px;letter-spacing:.2px;margin-bottom:calc(.75*var(--u))}
+    .loc{font-size:18px;opacity:.85;margin-bottom:calc(1.25*var(--u))}
 
-    .bio{font-size:var(--bio-size);margin:var(--bio-push) 0 28px}
-    hr{border:none;border-top:1px solid currentColor;opacity:.25;width:100%;margin:22px 0 28px}
+    /* Bio centered with a readable line-length */
+    .bio{
+      font-size:var(--bio-size);
+      max-width:56ch;
+      margin:calc(2*var(--u)) auto calc(3*var(--u));
+      text-align:center;
+    }
 
-    .pieces{display:grid;gap:22px;margin-top:4px}
-    .piece h2{font-size:22px;font-weight:600;margin-bottom:4px}
-    .piece .url{font-size:16px;opacity:.8;word-break:break-all}
+    hr{border:none;border-top:1px solid currentColor;opacity:.2;width:100%;margin:calc(2*var(--u)) 0}
+
+    .pieces{display:grid;gap:calc(2*var(--u));margin-top:var(--u)}
+    .piece h2{font-size:22px;font-weight:600;margin-bottom:calc(.25*var(--u))}
+    .piece .url{font-size:16px;opacity:.8;word-break:break-all;margin-top:2px}
 
     /* Links: no underline until hover */
     a, a:visited, a:active{color:inherit;text-decoration:none}
     a:hover, a:focus{text-decoration:underline;text-underline-offset:2px}
 
-    /* Footer */
+    /* Footer pinned low, safe on iOS */
     footer{
-      position:fixed;left:0;right:0;bottom:var(--footer-up);
-      font-size:16px;height:1.6em;
+      position:fixed; left:0; right:0;
+      bottom:calc(var(--footer-up) + env(safe-area-inset-bottom, 0px));
+      font-size:16px; height:1.6em;
     }
-    /* Full-width layer so the dot can be at true page center */
-    .footwrap{
-      position:relative;
-      width:100%;
-      height:100%;
-    }
+
+    /* Full-width layer so the dot is truly at page center */
+    .footwrap{ position:relative; width:100%; height:100%; }
     .dot{
       position:absolute; left:50%; top:0; transform:translateX(-50%);
       opacity:.6; pointer-events:none; line-height:1.6em;
@@ -72,11 +79,11 @@
       position:absolute; white-space:nowrap; line-height:1.6em;
       border-bottom:1px solid currentColor; border-bottom-color:transparent;
     }
-    footer a:hover{border-bottom-color:currentColor}
+    footer a:hover{ border-bottom-color:currentColor; }
 
-    /* snug emails hugging the centered dot */
-    .left  { right:50%; margin-right:var(--gap); text-align:right; }
-    .right { left:50%;  margin-left:var(--gap);  text-align:left;  }
+    /* Emails hug the centered dot with a modest gap */
+    .left  { right:50%; margin-right:var(--email-gap); text-align:right; }
+    .right { left:50%;  margin-left:var(--email-gap);  text-align:left;  }
 
     /* Stack neatly on narrow screens */
     @media (max-width:520px){
@@ -89,10 +96,11 @@
 </head>
 <body>
   <main>
-    <img id="hero" src="IMG_0429.jpeg" alt="Eric Li" loading="eager" decoding="async">
-
-    <h1>Eric Li</h1>
-    <div class="loc">Palo Alto, CA</div>
+    <div class="masthead">
+      <img id="hero" src="IMG_0429.jpeg" alt="Eric Li" loading="eager" decoding="async">
+      <h1>Eric Li</h1>
+      <div class="loc">Palo Alto, CA</div>
+    </div>
 
     <p class="bio">
       I left Harvard at 20 to become xAI’s first Special Projects hire/lead. Previously, I consulted for Polymarket.
