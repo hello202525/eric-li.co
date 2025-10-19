@@ -18,9 +18,9 @@
       --stack:680px;             /* page column width */
       --top:64px;                /* top margin */
       --hero-size:340px;         /* image width */
-      --afterhead-push:72px;     /* baseline gap below location */
-      --bio-lift:28px;           /* move ONLY the bio upward (visual) */
-      --below-push:24px;         /* push everything below the bio DOWN */
+      --afterhead-push:72px;     /* baseline gap below location (kept) */
+      --equal-gap:6px;           /* gap to match: h1↔loc and loc↔bio */
+      --below-push:24px;         /* push block below bio down a bit */
       --footer-up:40px;          /* emails position */
       --content-shift-left:28px; /* left nudge for body content */
     }
@@ -41,17 +41,27 @@
 
     /* Only these are centered */
     #hero{display:block;margin:0 auto 12px;width:var(--hero-size);height:auto;max-width:90vw}
-    h1{font-weight:600;font-size:48px;letter-spacing:.2px;margin-bottom:6px;text-align:center}
-    .loc{font-size:22px;opacity:.9;margin-bottom:6px;text-align:center}
+    h1{
+      font-weight:600;font-size:48px;letter-spacing:.2px;
+      margin-bottom:var(--equal-gap);text-align:center;
+    }
+    .loc{
+      font-size:22px;opacity:.9;
+      margin-bottom:var(--equal-gap);text-align:center;
+    }
 
     /* Everything after the location */
     .afterhead{margin-top:var(--afterhead-push)}
     .content{margin-left:calc(-1 * var(--content-shift-left))}
 
-    /* Bio: single line, visually lifted up; does NOT affect layout below */
-    .bio{font-size:20px;margin:0 0 28px;position:relative;top:calc(-1 * var(--bio-lift))}
+    /* Bio: single line, lifted so loc↔bio gap == h1↔loc gap */
+    .bio{
+      font-size:20px;margin:0 0 28px;
+      position:relative;
+      top:calc(-1 * (var(--afterhead-push) - var(--equal-gap)));
+    }
 
-    /* Everything below bio gets pushed down slightly */
+    /* Everything below the bio stays a bit lower */
     .below-bio{margin-top:var(--below-push)}
 
     hr{border:none;border-top:1px solid currentColor;opacity:.25;width:100%;margin:22px 0 28px}
