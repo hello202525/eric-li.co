@@ -5,98 +5,63 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Eric Li</title>
 
+  <!-- Force light background -->
+  <meta name="color-scheme" content="light">
+
   <!-- Cormorant Garamond -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;600&display=swap" rel="stylesheet">
 
-  <meta name="description" content="Eric Li — Palo Alto, CA." />
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    :root {
-      --ink: #000;
-      --paper: #fff;
-      --stack: 680px;
-      --top: 64px;
+    :root{
+      --ink:#000;
+      --paper:#fff;
+      --stack:680px;
+      --top:64px;
+      --hero-size:220px;  /* image width */
+      --bio-push:28px;    /* push bio down */
+      --footer-up:40px;   /* raise emails from bottom */
     }
-    @media (prefers-color-scheme: dark) {
-      :root { --ink: #f4f4f4; --paper: #0a0a0a; }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{height:100%}
+    body{
+      background:var(--paper); color:var(--ink);
+      font-family:'Cormorant Garamond',serif; line-height:1.5;
+      -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
     }
-    html, body { height: 100%; }
-    body {
-      font-family: 'Cormorant Garamond', serif;
-      background: var(--paper);
-      color: var(--ink);
-      line-height: 1.5;
-      -webkit-font-smoothing: antialiased;
-      text-rendering: optimizeLegibility;
-    }
-    main {
-      max-width: var(--stack);
-      margin: var(--top) auto 96px;
-      padding: 0 16px;
-      text-align: center;
+    main{
+      max-width:var(--stack);
+      margin:var(--top) auto 96px;
+      padding:0 16px;
+      text-align:left;          /* left by default */
     }
 
-    /* New: hero image */
-    #hero {
-      display: block;
-      margin: 0 auto 10px;
-      width: 160px;        /* tweak if you want larger/smaller */
-      height: auto;
-    }
+    /* Only these are centered */
+    #hero{display:block;margin:0 auto 12px;width:var(--hero-size);height:auto}
+    h1{font-weight:600;font-size:38px;letter-spacing:.2px;margin-bottom:6px;text-align:center}
+    .loc{font-size:18px;opacity:.85;margin-bottom:6px;text-align:center}
 
-    h1 {
-      font-weight: 600;
-      font-size: 38px;
-      letter-spacing: 0.2px;
-      margin-bottom: 6px;
+    .bio{font-size:20px;margin:var(--bio-push) 0 28px}
+    hr{border:none;border-top:1px solid currentColor;opacity:.25;width:100%;margin:22px 0 28px}
+
+    .pieces{display:grid;gap:22px;margin-top:4px}
+    .piece a{color:inherit;text-decoration:none;border-bottom:1px solid transparent}
+    .piece a:hover{border-bottom-color:currentColor}
+    .piece h2{font-size:22px;font-weight:600;margin-bottom:4px}
+    .piece .url{font-size:16px;opacity:.8;word-break:break-all}
+
+    footer{
+      position:fixed;left:0;right:0;bottom:var(--footer-up);
+      font-size:16px;
     }
-    .loc { font-size: 18px; opacity: 0.85; margin-bottom: 18px; }
-    .bio { font-size: 20px; margin: 12px auto 28px; }
-    hr {
-      border: none;
-      border-top: 1px solid currentColor;
-      opacity: 0.25;
-      width: 72%;
-      margin: 22px auto 28px;
-    }
-    .pieces { display: grid; gap: 22px; margin-top: 4px; }
-    .piece a {
-      color: inherit;
-      text-decoration: none;
-      border-bottom: 1px solid transparent;
-    }
-    .piece a:hover { border-bottom-color: currentColor; }
-    .piece h2 {
-      font-size: 22px;
-      font-weight: 600;
-      margin-bottom: 4px;
-    }
-    .piece .url {
-      font-size: 16px;
-      opacity: 0.8;
-      word-break: break-all;
-    }
-    footer {
-      position: fixed;
-      left: 0; right: 0; bottom: 16px;
-      text-align: center;
-      font-size: 16px;
-      pointer-events: none;
-    }
-    footer a {
-      color: inherit;
-      text-decoration: none;
-      border-bottom: 1px solid currentColor;
-      pointer-events: auto;
-    }
-    footer .dot { margin: 0 10px; opacity: 0.6; }
+    .footwrap{max-width:var(--stack);margin:0 auto;padding:0 16px;text-align:left}
+    footer a{color:inherit;text-decoration:none;border-bottom:1px solid currentColor}
+    footer .dot{margin:0 10px;opacity:.6}
   </style>
 </head>
 <body>
   <main>
-    <!-- Added image -->
     <img id="hero" src="IMG_0429.jpeg" alt="Eric Li" loading="eager" decoding="async">
 
     <h1>Eric Li</h1>
@@ -127,9 +92,11 @@
   </main>
 
   <footer>
-    <a href="mailto:erli@x.ai">erli@x.ai</a>
-    <span class="dot">·</span>
-    <a href="mailto:eric_li1@college.harvard.edu">eric_li1@college.harvard.edu</a>
+    <div class="footwrap">
+      <a href="mailto:erli@x.ai">erli@x.ai</a>
+      <span class="dot">·</span>
+      <a href="mailto:eric_li1@college.harvard.edu">eric_li1@college.harvard.edu</a>
+    </div>
   </footer>
 </body>
 </html>
