@@ -14,62 +14,79 @@
     :root{
       --ink:#000;
       --paper:#fff;
-      --stack:680px;
-      --u:8px;             /* base unit for consistent rhythm */
-      --top:8px;           /* reduced top to pull content up a touch */
-      --hero-size:320px;   /* a bit larger */
-      --bio-size:19px;     /* your “tinge smaller” */
-      --footer-up:32px;
-      --email-gap:10px;    /* tighter gap around the centered dot */
+
+      /* layout + rhythm */
+      --stack:640px;
+      --u:8px;              /* base rhythm unit */
+      --top:56px;
+      --footer-up:28px;
+
+      /* type scale */
+      --body:18px;
+      --h1:32px;            /* down from 38 for balance */
+      --loc:16px;
+      --bio:18px;           /* “tinge smaller” than before */
+      --title:20px;
+      --url:14px;
+
+      /* media */
+      --hero-size:clamp(220px, 35vw, 360px);
+
+      /* footer */
+      --email-gap:12px;     /* space between emails and centered dot */
     }
 
     *{box-sizing:border-box;margin:0;padding:0}
     html,body{height:100%}
     body{
       background:var(--paper); color:var(--ink);
-      font-family:'Cormorant Garamond',serif; line-height:1.5;
+      font-family:'Cormorant Garamond',serif;
+      font-size:var(--body);
+      line-height:1.45;
       -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
     }
 
     main{
       max-width:var(--stack);
-      margin:calc(var(--top) + 6*var(--u)) auto calc(12*var(--u));
+      margin:var(--top) auto calc(12*var(--u));
       padding:0 16px;
-      text-align:left;
     }
 
-    /* Masthead block is centered for cohesion */
+    /* Masthead (centered block) */
     .masthead{ text-align:center; }
-    #hero{display:block;margin:0 auto calc(1.5*var(--u));width:var(--hero-size);height:auto}
-    h1{font-weight:600;font-size:38px;letter-spacing:.2px;margin-bottom:calc(.75*var(--u))}
-    .loc{font-size:18px;opacity:.85;margin-bottom:calc(1.25*var(--u))}
+    #hero{display:block;margin:0 auto calc(2*var(--u));width:var(--hero-size);height:auto}
+    h1{font-weight:600;font-size:var(--h1);letter-spacing:.2px;margin-bottom:var(--u)}
+    .loc{font-size:var(--loc);opacity:.85;margin-bottom:calc(2*var(--u))}
 
-    /* Bio centered with a readable line-length */
+    /* Bio */
     .bio{
-      font-size:var(--bio-size);
+      font-size:var(--bio);
       max-width:56ch;
-      margin:calc(2*var(--u)) auto calc(3*var(--u));
+      margin:0 auto calc(3*var(--u));
       text-align:center;
     }
 
-    hr{border:none;border-top:1px solid currentColor;opacity:.2;width:100%;margin:calc(2*var(--u)) 0}
+    /* Divider */
+    hr{
+      border:none;border-top:1px solid currentColor;opacity:.18;
+      width:100%; margin:calc(2*var(--u)) 0 calc(3*var(--u));
+    }
 
+    /* Pieces list */
     .pieces{display:grid;gap:calc(2*var(--u));margin-top:var(--u)}
-    .piece h2{font-size:22px;font-weight:600;margin-bottom:calc(.25*var(--u))}
-    .piece .url{font-size:16px;opacity:.8;word-break:break-all;margin-top:2px}
+    .piece h2{font-size:var(--title);font-weight:600;margin-bottom:calc(.5*var(--u))}
+    .piece .url{font-size:var(--url);opacity:.8;word-break:break-all}
 
-    /* Links: no underline until hover */
+    /* Links: underline only on hover */
     a, a:visited, a:active{color:inherit;text-decoration:none}
     a:hover, a:focus{text-decoration:underline;text-underline-offset:2px}
 
-    /* Footer pinned low, safe on iOS */
+    /* Footer pinned low, dot truly centered on the page */
     footer{
       position:fixed; left:0; right:0;
       bottom:calc(var(--footer-up) + env(safe-area-inset-bottom, 0px));
       font-size:16px; height:1.6em;
     }
-
-    /* Full-width layer so the dot is truly at page center */
     .footwrap{ position:relative; width:100%; height:100%; }
     .dot{
       position:absolute; left:50%; top:0; transform:translateX(-50%);
@@ -80,12 +97,10 @@
       border-bottom:1px solid currentColor; border-bottom-color:transparent;
     }
     footer a:hover{ border-bottom-color:currentColor; }
-
-    /* Emails hug the centered dot with a modest gap */
     .left  { right:50%; margin-right:var(--email-gap); text-align:right; }
     .right { left:50%;  margin-left:var(--email-gap);  text-align:left;  }
 
-    /* Stack neatly on narrow screens */
+    /* Narrow screens: stack emails cleanly */
     @media (max-width:520px){
       footer{height:auto}
       .footwrap{position:static;text-align:center;padding:0 16px}
