@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Eric Li</title>
+
+  <!-- Cormorant Garamond -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;600&display=swap" rel="stylesheet">
+
+  <meta name="description" content="Eric Li — Palo Alto, CA." />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --ink: #000;
+      --paper: #fff;
+      --stack: 680px;
+      --top: 64px;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root { --ink: #f4f4f4; --paper: #0a0a0a; }
+    }
+    html, body { height: 100%; }
+    body {
+      font-family: 'Cormorant Garamond', serif;
+      background: var(--paper);
+      color: var(--ink);
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+    main {
+      max-width: var(--stack);
+      margin: var(--top) auto 96px;
+      padding: 0 16px;
+      text-align: center;
+    }
+
+    /* New: hero image */
+    #hero {
+      display: block;
+      margin: 0 auto 10px;
+      width: 160px;        /* tweak if you want larger/smaller */
+      height: auto;
+    }
+
+    h1 {
+      font-weight: 600;
+      font-size: 38px;
+      letter-spacing: 0.2px;
+      margin-bottom: 6px;
+    }
+    .loc { font-size: 18px; opacity: 0.85; margin-bottom: 18px; }
+    .bio { font-size: 20px; margin: 12px auto 28px; }
+    hr {
+      border: none;
+      border-top: 1px solid currentColor;
+      opacity: 0.25;
+      width: 72%;
+      margin: 22px auto 28px;
+    }
+    .pieces { display: grid; gap: 22px; margin-top: 4px; }
+    .piece a {
+      color: inherit;
+      text-decoration: none;
+      border-bottom: 1px solid transparent;
+    }
+    .piece a:hover { border-bottom-color: currentColor; }
+    .piece h2 {
+      font-size: 22px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    .piece .url {
+      font-size: 16px;
+      opacity: 0.8;
+      word-break: break-all;
+    }
+    footer {
+      position: fixed;
+      left: 0; right: 0; bottom: 16px;
+      text-align: center;
+      font-size: 16px;
+      pointer-events: none;
+    }
+    footer a {
+      color: inherit;
+      text-decoration: none;
+      border-bottom: 1px solid currentColor;
+      pointer-events: auto;
+    }
+    footer .dot { margin: 0 10px; opacity: 0.6; }
+  </style>
+</head>
+<body>
+  <main>
+    <!-- Added image -->
+    <img id="hero" src="IMG_0429.jpeg" alt="Eric Li" loading="eager" decoding="async">
+
+    <h1>Eric Li</h1>
+    <div class="loc">Palo Alto, CA</div>
+
+    <p class="bio">
+      I left Harvard at 20 to become xAI’s first Special Projects hire/lead. Previously, I consulted for Polymarket.
+    </p>
+
+    <hr>
+
+    <section class="pieces" aria-label="Selected posts">
+      <article class="piece">
+        <h2><a href="https://x.com/ericli1_/status/1962105026052006032" target="_blank" rel="noopener">Everyone Wants to Trade Everything</a></h2>
+        <div class="url">x.com/ericli1_/status/1962105026052006032</div>
+      </article>
+
+      <article class="piece">
+        <h2><a href="https://x.com/ericli1_/status/1966220771501527203" target="_blank" rel="noopener">Do Prediction Markets Predict?</a></h2>
+        <div class="url">x.com/ericli1_/status/1966220771501527203</div>
+      </article>
+
+      <article class="piece">
+        <h2><a href="https://x.com/ericli1_/status/1972784924374774125" target="_blank" rel="noopener">“If You Want Peace, You Must Prepare for War”</a></h2>
+        <div class="url">x.com/ericli1_/status/1972784924374774125</div>
+      </article>
+    </section>
+  </main>
+
+  <footer>
+    <a href="mailto:erli@x.ai">erli@x.ai</a>
+    <span class="dot">·</span>
+    <a href="mailto:eric_li1@college.harvard.edu">eric_li1@college.harvard.edu</a>
+  </footer>
+</body>
+</html>
