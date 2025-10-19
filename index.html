@@ -4,6 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Eric Li</title>
+
+  <!-- Force light background -->
   <meta name="color-scheme" content="light">
 
   <!-- Cormorant Garamond -->
@@ -15,15 +17,12 @@
     :root{
       --ink:#000;
       --paper:#fff;
-      --stack:680px;          /* page column width */
-      --top:64px;             /* top margin */
-      --hero-size:340px;      /* image width */
-      --equal-gap:12px;       /* SAME gap: Name↔Location and Location↔Bio (slightly bigger) */
-      --below-push:24px;      /* keeps HR + articles a bit lower */
-      --footer-up:40px;       /* emails position */
-      --content-shift-left:28px; /* nudge body content left */
+      --stack:680px;
+      --top:64px;
+      --hero-size:220px;  /* image width */
+      --bio-push:28px;    /* push bio down */
+      --footer-up:40px;   /* raise emails from bottom */
     }
-
     *{box-sizing:border-box;margin:0;padding:0}
     html,body{height:100%}
     body{
@@ -33,97 +32,70 @@
     }
     main{
       max-width:var(--stack);
-      margin:var(--top) auto 140px;
+      margin:var(--top) auto 96px;
       padding:0 16px;
-      text-align:left; /* default left */
+      text-align:left;          /* left by default */
     }
 
     /* Only these are centered */
-    #hero{display:block;margin:0 auto 12px;width:var(--hero-size);height:auto;max-width:90vw}
-    h1{font-weight:600;font-size:48px;letter-spacing:.2px;margin-bottom:var(--equal-gap);text-align:center}
-    .loc{font-size:22px;opacity:.9;margin-bottom:var(--equal-gap);text-align:center}
+    #hero{display:block;margin:0 auto 12px;width:var(--hero-size);height:auto}
+    h1{font-weight:600;font-size:38px;letter-spacing:.2px;margin-bottom:6px;text-align:center}
+    .loc{font-size:18px;opacity:.85;margin-bottom:6px;text-align:center}
 
-    /* Content after location */
-    .content{margin-left:calc(-1 * var(--content-shift-left))}
-    .bio{font-size:20px;margin:0 0 28px}       /* single line; gap handled by .loc margin-bottom */
-    .below-bio{margin-top:var(--below-push)}   /* keep HR + articles lower */
-
+    .bio{font-size:20px;margin:var(--bio-push) 0 28px}
     hr{border:none;border-top:1px solid currentColor;opacity:.25;width:100%;margin:22px 0 28px}
 
     .pieces{display:grid;gap:22px;margin-top:4px}
+    .piece a{color:inherit;text-decoration:none;border-bottom:1px solid transparent}
+    .piece a:hover{border-bottom-color:currentColor}
     .piece h2{font-size:22px;font-weight:600;margin-bottom:4px}
-    .piece .url{font-size:16px;opacity:.85;word-break:break-all}
+    .piece .url{font-size:16px;opacity:.8;word-break:break-all}
 
-    /* Links: no underline until hover (includes emails) */
-    a{color:inherit;text-decoration:none}
-    a:hover{text-decoration:underline}
-
-    /* Footer with dot perfectly centered */
     footer{
       position:fixed;left:0;right:0;bottom:var(--footer-up);
       font-size:16px;
     }
-    .footwrap{
-      max-width:var(--stack);margin:0 auto;padding:0 16px;
-      display:grid;grid-template-columns:1fr auto 1fr;align-items:center;
-      text-align:center;
-    }
-    .leftEmail{text-align:right}
-    .centerDot{text-align:center;opacity:.6;padding:0 10px}
-    .rightEmail{text-align:left}
+    .footwrap{max-width:var(--stack);margin:0 auto;padding:0 16px;text-align:left}
+    footer a{color:inherit;text-decoration:none;border-bottom:1px solid currentColor}
+    footer .dot{margin:0 10px;opacity:.6}
   </style>
 </head>
 <body>
   <main>
     <img id="hero" src="IMG_0429.jpeg" alt="Eric Li" loading="eager" decoding="async">
+
     <h1>Eric Li</h1>
     <div class="loc">Palo Alto, CA</div>
 
-    <div class="content">
-      <p class="bio">
-        I left Harvard at 20 to become xAI’s first Special Projects hire/lead. Previously, I consulted for Polymarket.
-      </p>
+    <p class="bio">
+      I left Harvard at 20 to become xAI’s first Special Projects hire/lead. Previously, I consulted for Polymarket.
+    </p>
 
-      <div class="below-bio">
-        <hr>
+    <hr>
 
-        <section class="pieces" aria-label="Selected posts">
-          <article class="piece">
-            <h2>Everyone Wants to Trade Everything</h2>
-            <div class="url">
-              <a href="https://x.com/ericli1_/status/1962105026052006032" target="_blank" rel="noopener">
-                x.com/ericli1_/status/1962105026052006032
-              </a>
-            </div>
-          </article>
+    <section class="pieces" aria-label="Selected posts">
+      <article class="piece">
+        <h2><a href="https://x.com/ericli1_/status/1962105026052006032" target="_blank" rel="noopener">Everyone Wants to Trade Everything</a></h2>
+        <div class="url">x.com/ericli1_/status/1962105026052006032</div>
+      </article>
 
-          <article class="piece">
-            <h2>Do Prediction Markets Predict?</h2>
-            <div class="url">
-              <a href="https://x.com/ericli1_/status/1966220771501527203" target="_blank" rel="noopener">
-                x.com/ericli1_/status/1966220771501527203
-              </a>
-            </div>
-          </article>
+      <article class="piece">
+        <h2><a href="https://x.com/ericli1_/status/1966220771501527203" target="_blank" rel="noopener">Do Prediction Markets Predict?</a></h2>
+        <div class="url">x.com/ericli1_/status/1966220771501527203</div>
+      </article>
 
-          <article class="piece">
-            <h2>“If You Want Peace, You Must Prepare for War”</h2>
-            <div class="url">
-              <a href="https://x.com/ericli1_/status/1972784924374774125" target="_blank" rel="noopener">
-                x.com/ericli1_/status/1972784924374774125
-              </a>
-            </div>
-          </article>
-        </section>
-      </div>
-    </div>
+      <article class="piece">
+        <h2><a href="https://x.com/ericli1_/status/1972784924374774125" target="_blank" rel="noopener">“If You Want Peace, You Must Prepare for War”</a></h2>
+        <div class="url">x.com/ericli1_/status/1972784924374774125</div>
+      </article>
+    </section>
   </main>
 
   <footer>
     <div class="footwrap">
-      <div class="leftEmail"><a href="mailto:erli@x.ai">erli@x.ai</a></div>
-      <div class="centerDot">·</div>
-      <div class="rightEmail"><a href="mailto:eric_li1@college.harvard.edu">eric_li1@college.harvard.edu</a></div>
+      <a href="mailto:erli@x.ai">erli@x.ai</a>
+      <span class="dot">·</span>
+      <a href="mailto:eric_li1@college.harvard.edu">eric_li1@college.harvard.edu</a>
     </div>
   </footer>
 </body>
