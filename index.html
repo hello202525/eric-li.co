@@ -15,13 +15,14 @@
     :root{
       --ink:#000;
       --paper:#fff;
-      --stack:680px;            /* page column width */
-      --top:64px;               /* top margin */
-      --hero-size:340px;        /* image width */
-      --afterhead-push:72px;    /* keeps articles where they are */
-      --bio-lift:28px;          /* lift ONLY the bio upward (tweak as needed) */
-      --footer-up:40px;         /* emails position */
-      --content-shift-left:28px;/* left nudge for body content */
+      --stack:680px;             /* page column width */
+      --top:64px;                /* top margin */
+      --hero-size:340px;         /* image width */
+      --afterhead-push:72px;     /* baseline gap below location */
+      --bio-lift:28px;           /* move ONLY the bio upward (visual) */
+      --below-push:24px;         /* push everything below the bio DOWN */
+      --footer-up:40px;          /* emails position */
+      --content-shift-left:28px; /* left nudge for body content */
     }
 
     *{box-sizing:border-box;margin:0;padding:0}
@@ -47,8 +48,11 @@
     .afterhead{margin-top:var(--afterhead-push)}
     .content{margin-left:calc(-1 * var(--content-shift-left))}
 
-    /* Bio: single line, lifted up; articles/HR remain unchanged */
-    .bio{font-size:20px;margin:calc(-1 * var(--bio-lift)) 0 28px}
+    /* Bio: single line, visually lifted up; does NOT affect layout below */
+    .bio{font-size:20px;margin:0 0 28px;position:relative;top:calc(-1 * var(--bio-lift))}
+
+    /* Everything below bio gets pushed down slightly */
+    .below-bio{margin-top:var(--below-push)}
 
     hr{border:none;border-top:1px solid currentColor;opacity:.25;width:100%;margin:22px 0 28px}
 
@@ -86,36 +90,38 @@
         I left Harvard at 20 to become xAI’s first Special Projects hire/lead. Previously, I consulted for Polymarket.
       </p>
 
-      <hr>
+      <div class="below-bio">
+        <hr>
 
-      <section class="pieces" aria-label="Selected posts">
-        <article class="piece">
-          <h2>Everyone Wants to Trade Everything</h2>
-          <div class="url">
-            <a href="https://x.com/ericli1_/status/1962105026052006032" target="_blank" rel="noopener">
-              x.com/ericli1_/status/1962105026052006032
-            </a>
-          </div>
-        </article>
+        <section class="pieces" aria-label="Selected posts">
+          <article class="piece">
+            <h2>Everyone Wants to Trade Everything</h2>
+            <div class="url">
+              <a href="https://x.com/ericli1_/status/1962105026052006032" target="_blank" rel="noopener">
+                x.com/ericli1_/status/1962105026052006032
+              </a>
+            </div>
+          </article>
 
-        <article class="piece">
-          <h2>Do Prediction Markets Predict?</h2>
-          <div class="url">
-            <a href="https://x.com/ericli1_/status/1966220771501527203" target="_blank" rel="noopener">
-              x.com/ericli1_/status/1966220771501527203
-            </a>
-          </div>
-        </article>
+          <article class="piece">
+            <h2>Do Prediction Markets Predict?</h2>
+            <div class="url">
+              <a href="https://x.com/ericli1_/status/1966220771501527203" target="_blank" rel="noopener">
+                x.com/ericli1_/status/1966220771501527203
+              </a>
+            </div>
+          </article>
 
-        <article class="piece">
-          <h2>“If You Want Peace, You Must Prepare for War”</h2>
-          <div class="url">
-            <a href="https://x.com/ericli1_/status/1972784924374774125" target="_blank" rel="noopener">
-              x.com/ericli1_/status/1972784924374774125
-            </a>
-          </div>
-        </article>
-      </section>
+          <article class="piece">
+            <h2>“If You Want Peace, You Must Prepare for War”</h2>
+            <div class="url">
+              <a href="https://x.com/ericli1_/status/1972784924374774125" target="_blank" rel="noopener">
+                x.com/ericli1_/status/1972784924374774125
+              </a>
+            </div>
+          </article>
+        </section>
+      </div>
     </div>
   </main>
 
