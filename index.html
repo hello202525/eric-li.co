@@ -18,20 +18,20 @@
       /* layout + rhythm */
       --stack:640px;
       --u:8px;
-      --top:44px;            /* a touch tighter at the top */
-      --footer-up:16px;      /* lower = closer to bottom */
+      /* push content near the middle on tall viewports */
+      --top:clamp(48px, 24vh, 240px);
+      --footer-up:16px;
 
-      /* type scale (bumped up) */
+      /* type scale (bigger) */
       --body:20px;
-      --h1:46px;
-      --title:22px;
-      --url:18px;
+      --h1:56px;
+      --footer-size:18px;     /* bigger emails */
 
       /* media */
-      --hero-size:clamp(240px, 36vw, 380px);
+      --hero-size:clamp(300px, 44vw, 520px);
 
       /* footer */
-      --email-gap:10px;      /* slightly closer to the dot (kept) */
+      --email-gap:10px;       /* slight gap around the dot */
     }
 
     *{box-sizing:border-box;margin:0;padding:0}
@@ -46,39 +46,35 @@
 
     main{
       max-width:var(--stack);
-      margin:var(--top) auto calc(12*var(--u));
+      margin:var(--top) auto calc(10*var(--u));
       padding:0 16px;
     }
 
     /* Masthead */
     .masthead{ text-align:center; }
-    #hero{display:block;margin:0 auto calc(2*var(--u));width:var(--hero-size);height:auto}
+    #hero{display:block;margin:0 auto calc(2.5*var(--u));width:var(--hero-size);height:auto}
     h1{font-weight:600;font-size:var(--h1);letter-spacing:.2px;margin-bottom:var(--u)}
-
-    /* Divider */
-    hr{
-      border:none;border-top:1px solid currentColor;opacity:.18;
-      width:100%; margin:calc(1.5*var(--u)) 0 calc(2.5*var(--u));
-    }
-
-    /* Pieces list */
-    .pieces{display:grid;gap:calc(2*var(--u));margin-top:var(--u)}
-    .piece h2{font-size:var(--title);font-weight:600;margin-bottom:calc(.5*var(--u))}
-    .piece .url{font-size:var(--url);opacity:.8;word-break:break-all}
-
-    /* Links: underline only on hover */
     a, a:visited, a:active{color:inherit;text-decoration:none}
     a:hover, a:focus{text-decoration:underline; text-underline-offset:2px}
 
-    /* Footer with dot truly centered on page */
+    /* Footer with X above emails; emails stay fixed at bottom */
     footer{
       position:fixed; left:0; right:0;
       bottom:calc(var(--footer-up) + env(safe-area-inset-bottom, 0px));
-      font-size:16px; height:1.6em;
+      font-size:var(--footer-size);
+      height:3.4em; /* room for X row + emails row */
     }
     .footwrap{ position:relative; width:100%; height:100%; }
-    .dot{
+    /* X link (top row) */
+    .xlink{
       position:absolute; left:50%; top:0; transform:translateX(-50%);
+      line-height:1.6em; text-decoration:none;
+    }
+    .xlink:hover{ text-decoration:underline; text-underline-offset:2px }
+
+    /* Emails (second row) */
+    .dot{
+      position:absolute; left:50%; top:1.8em; transform:translateX(-50%);
       opacity:.6; pointer-events:none; line-height:1.6em;
     }
     footer a{
@@ -86,13 +82,14 @@
       border-bottom:1px solid currentColor; border-bottom-color:transparent;
     }
     footer a:hover{ border-bottom-color:currentColor; }
-    .left  { right:50%; margin-right:var(--email-gap); text-align:right; }
-    .right { left:50%;  margin-left:var(--email-gap);  text-align:left;  }
+    .left  { right:50%; top:1.8em; margin-right:var(--email-gap); text-align:right; }
+    .right { left:50%;  top:1.8em; margin-left:var(--email-gap);  text-align:left;  }
 
-    /* Narrow screens: stack emails cleanly */
+    /* Narrow screens: stack cleanly */
     @media (max-width:520px){
       footer{height:auto}
       .footwrap{position:static;text-align:center;padding:0 16px}
+      .xlink{position:static;transform:none;display:block;margin-bottom:4px}
       .dot{position:static;transform:none;display:inline;margin:0 10px}
       .left,.right{position:static;display:inline}
     }
@@ -107,45 +104,13 @@
           Eric Li
         </a>
       </h1>
-      <!-- location removed -->
     </div>
-
-    <!-- bio removed -->
-
-    <hr>
-
-    <section class="pieces" aria-label="Selected posts">
-      <article class="piece">
-        <h2>Everyone Wants to Trade Everything</h2>
-        <div class="url">
-          <a href="https://x.com/ericli1_/status/1962105026052006032" target="_blank" rel="noopener noreferrer">
-            x.com/ericli1_/status/1962105026052006032
-          </a>
-        </div>
-      </article>
-
-      <article class="piece">
-        <h2>Do Prediction Markets Predict?</h2>
-        <div class="url">
-          <a href="https://x.com/ericli1_/status/1966220771501527203" target="_blank" rel="noopener noreferrer">
-            x.com/ericli1_/status/1966220771501527203
-          </a>
-        </div>
-      </article>
-
-      <article class="piece">
-        <h2>“If You Want Peace, You Must Prepare for War”</h2>
-        <div class="url">
-          <a href="https://x.com/ericli1_/status/1972784924374774125" target="_blank" rel="noopener noreferrer">
-            x.com/ericli1_/status/1972784924374774125
-          </a>
-        </div>
-      </article>
-    </section>
   </main>
 
   <footer>
-    <div class="footwrap" aria-label="Contact">
+    <div class="footwrap" aria-label="Contact & Social">
+      <a class="xlink" href="https://x.com/@ericli1_" target="_blank" rel="noopener noreferrer">𝕏</a>
+
       <a class="left"  href="https://mail.google.com/mail/?view=cm&fs=1&to=erli@x.ai" target="_blank" rel="noopener noreferrer">erli@x.ai</a>
       <span class="dot">·</span>
       <a class="right" href="https://mail.google.com/mail/?view=cm&fs=1&to=eric_li1@college.harvard.edu" target="_blank" rel="noopener noreferrer">eric_li1@college.harvard.edu</a>
