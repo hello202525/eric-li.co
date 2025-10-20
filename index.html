@@ -15,17 +15,19 @@
       --ink:#000;
       --paper:#fff;
 
-      /* smaller base type */
-      --body:18px;
+      /* base type (slightly bigger than tiny) */
+      --body:19px;
 
-      /* much smaller image */
-      --hero-size:clamp(180px, 28vw, 320px);
+      /* image slightly bigger */
+      --hero-size:clamp(220px, 34vw, 420px);
 
-      /* smaller contact text */
-      --footer-size:clamp(16px, 1.6vw, 18px);
-      --social-size:clamp(20px, 2vw, 24px);
+      /* contact text a bit bigger */
+      --footer-size:clamp(18px, 2vw, 22px);
+      --social-size:clamp(24px, 2.4vw, 30px);
 
-      --email-gap:12px;
+      /* spacing */
+      --email-gap:14px;   /* gap from dot to labels */
+      --center-gap:14px;  /* symmetric offset from center dot */
     }
 
     *{box-sizing:border-box;margin:0;padding:0}
@@ -41,6 +43,7 @@
       padding-bottom:env(safe-area-inset-bottom,0px);
     }
 
+    /* Center the masthead */
     main{
       flex:1;
       display:flex; align-items:center; justify-content:center;
@@ -49,21 +52,22 @@
     .masthead{ text-align:center; max-width:680px; width:100%; }
     #hero{
       display:block; width:var(--hero-size); height:auto;
-      margin:0 auto clamp(8px, 2vh, 14px);
+      margin:0 auto clamp(10px, 2.2vh, 16px);
     }
 
     a, a:visited, a:active{color:inherit;text-decoration:none}
     a:hover, a:focus{text-decoration:underline; text-underline-offset:2px}
 
+    /* Footer raised upward a bit */
     footer{
       margin-top:auto;
-      margin-bottom:clamp(18px, 8vh, 48px);
+      margin-bottom:clamp(28px, 14vh, 96px);  /* move the text up */
       padding:6px 16px 0;
       font-size:var(--footer-size);
     }
     .footwrap{
       display:flex; flex-direction:column; align-items:center;
-      row-gap:8px;
+      row-gap:16px;                 /* ↑ a little more space between X and emails */
       width:100%;
       max-width:680px;
       margin:0 auto;
@@ -71,13 +75,28 @@
 
     .xlink{ font-size:var(--social-size); line-height:1; }
 
-    /* center contact line as one unit */
+    /* Centered-dot layout: dot fixed at exact center */
     .emails{
-      display:inline-flex;
-      align-items:baseline;
-      gap:var(--email-gap);
-      white-space:nowrap;
+      position:relative;
+      width:100%;
+      min-height:1.2em;
       margin:0 auto;
+    }
+    .emails .dot{
+      position:absolute; left:50%; transform:translateX(-50%);
+      pointer-events:none; opacity:.75;
+    }
+    .emails .left{
+      position:absolute; right:calc(50% + var(--center-gap));
+      white-space:nowrap; text-align:right;
+    }
+    .emails .right{
+      position:absolute; left:calc(50% + var(--center-gap));
+      white-space:nowrap;
+    }
+
+    @media (max-width:520px){
+      :root{ --center-gap:12px; }
     }
   </style>
 </head>
@@ -94,9 +113,9 @@
       <a class="xlink" href="https://x.com/@ericli1_" target="_blank" rel="noopener noreferrer">𝕏</a>
 
       <div class="emails">
-        <a href="https://mail.google.com/mail/?view=cm&fs=1&to=erli@x.ai" target="_blank" rel="noopener noreferrer">xAI</a>
-        <span aria-hidden="true">·</span>
-        <a href="https://mail.google.com/mail/?view=cm&fs=1&to=eric_li1@college.harvard.edu" target="_blank" rel="noopener noreferrer">Harvard</a>
+        <a class="left"  href="https://mail.google.com/mail/?view=cm&fs=1&to=erli@x.ai" target="_blank" rel="noopener noreferrer">xAI</a>
+        <span class="dot" aria-hidden="true">·</span>
+        <a class="right" href="https://mail.google.com/mail/?view=cm&fs=1&to=eric_li1@college.harvard.edu" target="_blank" rel="noopener noreferrer">Harvard</a>
       </div>
     </div>
   </footer>
