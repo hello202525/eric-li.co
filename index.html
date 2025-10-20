@@ -18,21 +18,20 @@
       /* layout + rhythm */
       --stack:640px;
       --u:8px;
-      --top:48px;            /* nudged up a bit */
+      --top:44px;            /* a touch tighter at the top */
       --footer-up:16px;      /* lower = closer to bottom */
 
-      /* type scale */
-      --body:18px;
-      --h1:40px;             /* bigger name */
-      --bio:18px;            /* “tinge smaller” than original 20 */
-      --title:20px;
-      --url:16px;            /* article link size bumped up */
+      /* type scale (bumped up) */
+      --body:20px;
+      --h1:46px;
+      --title:22px;
+      --url:18px;
 
       /* media */
       --hero-size:clamp(240px, 36vw, 380px);
 
       /* footer */
-      --email-gap:10px;      /* slightly closer to the dot */
+      --email-gap:10px;      /* slightly closer to the dot (kept) */
     }
 
     *{box-sizing:border-box;margin:0;padding:0}
@@ -56,18 +55,10 @@
     #hero{display:block;margin:0 auto calc(2*var(--u));width:var(--hero-size);height:auto}
     h1{font-weight:600;font-size:var(--h1);letter-spacing:.2px;margin-bottom:var(--u)}
 
-    /* Bio */
-    .bio{
-      font-size:var(--bio);
-      max-width:56ch;
-      margin:0 auto calc(3*var(--u));
-      text-align:center;
-    }
-
     /* Divider */
     hr{
       border:none;border-top:1px solid currentColor;opacity:.18;
-      width:100%; margin:calc(2*var(--u)) 0 calc(3*var(--u));
+      width:100%; margin:calc(1.5*var(--u)) 0 calc(2.5*var(--u));
     }
 
     /* Pieces list */
@@ -111,13 +102,15 @@
   <main>
     <div class="masthead">
       <img id="hero" src="IMG_0429.jpeg" alt="Eric Li" loading="eager" decoding="async">
-      <h1>Eric Li</h1>
-      <!-- Location removed -->
+      <h1>
+        <a href="https://www.linkedin.com/in/eric-li-226850249" target="_blank" rel="noopener noreferrer">
+          Eric Li
+        </a>
+      </h1>
+      <!-- location removed -->
     </div>
 
-    <p class="bio">
-      I left Harvard at 20 to become xAI’s first Special Projects hire/lead. Previously, I consulted for Polymarket.
-    </p>
+    <!-- bio removed -->
 
     <hr>
 
@@ -159,4 +152,4 @@
     </div>
   </footer>
 </body>
-</html>  
+</html>
