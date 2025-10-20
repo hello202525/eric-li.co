@@ -66,8 +66,8 @@
 
     footer{
       margin-top:auto;
-      /* pull the contact line further toward the center */
-      margin-bottom: clamp(96px, 20vh, 240px);
+      /* lowered a bit toward the bottom (was much higher before) */
+      margin-bottom: clamp(32px, 10vh, 128px);
       padding:6px 16px 0;
       font-size:var(--contact-size);
     }
@@ -79,13 +79,21 @@
       text-align:center;
     }
 
-    /* One centered line: 𝕏 · xAI · Harvard */
+    /* Grid ensures "xAI" sits on the physical center of the page */
     .contact{
-      display:flex; align-items:baseline; justify-content:center; flex-wrap:wrap;
+      display:grid;
+      grid-template-columns: 1fr auto auto auto 1fr; /* L · CENTER · R */
+      align-items:baseline;
+      column-gap: var(--group-gap);
       letter-spacing:.01em;
+      white-space:nowrap; /* keep the trio on one line so centering holds */
     }
+    .left  { justify-self:end; }
+    .center{ justify-self:center; }
+    .right { justify-self:start; }
+
     .sep{
-      margin:0 var(--group-gap);
+      margin:0; /* grid gap handles spacing */
       line-height:1;
       opacity:.75;
       user-select:none;
@@ -115,11 +123,11 @@
   <footer>
     <div class="footwrap" aria-label="Contact & Social">
       <div class="contact">
-        <a class="xlink" href="https://x.com/@ericli1_" target="_blank" rel="noopener noreferrer">𝕏</a>
+        <a class="xlink left" href="https://x.com/@ericli1_" target="_blank" rel="noopener noreferrer">𝕏</a>
         <span class="sep" aria-hidden="true">·</span>
-        <a href="https://mail.google.com/mail/?view=cm&fs=1&to=erli@x.ai" target="_blank" rel="noopener noreferrer">xAI</a>
+        <a class="center" href="https://mail.google.com/mail/?view=cm&fs=1&to=erli@x.ai" target="_blank" rel="noopener noreferrer">xAI</a>
         <span class="sep" aria-hidden="true">·</span>
-        <a href="https://mail.google.com/mail/?view=cm&fs=1&to=eric_li1@college.harvard.edu" target="_blank" rel="noopener noreferrer">Harvard</a>
+        <a class="right" href="https://mail.google.com/mail/?view=cm&fs=1&to=eric_li1@college.harvard.edu" target="_blank" rel="noopener noreferrer">Harvard</a>
       </div>
     </div>
   </footer>
