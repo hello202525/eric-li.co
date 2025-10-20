@@ -18,8 +18,14 @@
       --body:19px;
       --hero-size:clamp(300px, 60vmin, 640px);
 
-      /* slightly bigger contact line */
-      --contact-size:clamp(20px, 2.6vw, 28px);
+      /* contact line */
+      --contact-size:clamp(20px, 2.8vw, 30px);
+
+      /* spacing around center dots */
+      --group-gap: clamp(.6ch, 1.3vw, 1.2ch);
+
+      /* tiny shrink to make 𝕏 match cap height */
+      --x-tweak: 0.965; /* 96.5% of text size */
     }
 
     *{box-sizing:border-box;margin:0;padding:0}
@@ -62,18 +68,24 @@
       margin:0 auto;
     }
 
-    /* Single centered line: 𝕏 · xAI · Harvard College */
+    /* One centered line: 𝕏 · xAI · Harvard College */
     .contact{
       display:flex; align-items:baseline; justify-content:center; flex-wrap:wrap;
+      letter-spacing:.01em;
     }
     .sep{
-      padding:0 .45ch; line-height:1; opacity:.75; user-select:none;
+      margin:0 var(--group-gap);
+      line-height:1;
+      opacity:.75;
+      user-select:none;
     }
 
-    /* ensure the 𝕏 glyph renders consistently */
+    /* make the 𝕏 render consistently and slightly smaller */
     .xlink{
       font-family: system-ui, -apple-system, "Segoe UI", "Segoe UI Symbol",
                    "Noto Sans Math", "Apple Symbols", Roboto, sans-serif;
+      display:inline-block;
+      font-size: calc(1em * var(--x-tweak));
       line-height:1;
     }
   </style>
