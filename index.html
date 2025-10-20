@@ -16,7 +16,7 @@
       --paper:#fff;
 
       --body:19px;
-      /* image a tinge bigger */
+      /* keep the slightly larger image */
       --hero-size:clamp(320px, 64vmin, 680px);
 
       /* footer/contacts sizing */
@@ -52,7 +52,11 @@
       display:flex; align-items:center; justify-content:center;
       padding:clamp(18px, 5vh, 40px) 16px;
     }
-    .masthead{ text-align:center; max-width:680px; width:100%; }
+    /* shift the image down slightly from exact center */
+    .masthead{
+      text-align:center; max-width:680px; width:100%;
+      transform: translateY(clamp(4px, 1.2vh, 14px));
+    }
 
     /* clickable hero link + focus style */
     .hero-link{ display:inline-block }
@@ -72,7 +76,7 @@
 
     footer{
       margin-top:auto;
-      /* shift the 𝕏 up a tinge by increasing bottom margin */
+      /* keep the X slightly higher on the page */
       margin-bottom: clamp(40px, 13vh, 144px);
       padding:6px 16px 0;
       font-size:var(--contact-size);
