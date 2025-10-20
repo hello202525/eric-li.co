@@ -47,6 +47,15 @@
       padding:clamp(18px, 5vh, 40px) 16px;
     }
     .masthead{ text-align:center; max-width:680px; width:100%; }
+
+    /* clickable hero link + focus style */
+    .hero-link{ display:inline-block }
+    .hero-link:focus-visible{
+      outline:2px solid currentColor;
+      outline-offset:6px;
+      border-radius:6px;
+    }
+
     #hero{
       display:block; width:var(--hero-size); height:auto;
       margin:0 auto clamp(12px, 2.2vh, 18px);
@@ -57,7 +66,8 @@
 
     footer{
       margin-top:auto;
-      margin-bottom:clamp(24px, 6vh, 72px);
+      /* nudged up a bit more than before */
+      margin-bottom: clamp(28px, 8vh, 88px);
       padding:6px 16px 0;
       font-size:var(--contact-size);
     }
@@ -93,7 +103,11 @@
 <body>
   <main>
     <div class="masthead">
-      <img id="hero" src="IMG_0442.jpeg" alt="Eric Li" loading="eager" decoding="async">
+      <a class="hero-link" href="https://www.youtube.com/watch?v=2hSdEkDe87s"
+         target="_blank" rel="noopener noreferrer"
+         aria-label="Watch on YouTube">
+        <img id="hero" src="IMG_0442.jpeg" alt="Eric Li" loading="eager" decoding="async">
+      </a>
     </div>
   </main>
 
