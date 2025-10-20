@@ -18,22 +18,21 @@
       /* layout + rhythm */
       --stack:640px;
       --u:8px;
-      --top:56px;
-      --footer-up:16px;       /* lower = closer to bottom */
+      --top:48px;            /* nudged up a bit */
+      --footer-up:16px;      /* lower = closer to bottom */
 
       /* type scale */
       --body:18px;
-      --h1:40px;              /* bigger name */
-      --loc:20px;             /* bigger location */
-      --bio:18px;             /* “tinge smaller” than original 20 */
+      --h1:40px;             /* bigger name */
+      --bio:18px;            /* “tinge smaller” than original 20 */
       --title:20px;
-      --url:14px;
+      --url:16px;            /* article link size bumped up */
 
       /* media */
       --hero-size:clamp(240px, 36vw, 380px);
 
       /* footer */
-      --email-gap:12px;       /* spacing around centered dot */
+      --email-gap:10px;      /* slightly closer to the dot */
     }
 
     *{box-sizing:border-box;margin:0;padding:0}
@@ -56,7 +55,6 @@
     .masthead{ text-align:center; }
     #hero{display:block;margin:0 auto calc(2*var(--u));width:var(--hero-size);height:auto}
     h1{font-weight:600;font-size:var(--h1);letter-spacing:.2px;margin-bottom:var(--u)}
-    .loc{font-size:var(--loc);opacity:.85;margin-bottom:calc(2*var(--u))}
 
     /* Bio */
     .bio{
@@ -114,7 +112,7 @@
     <div class="masthead">
       <img id="hero" src="IMG_0429.jpeg" alt="Eric Li" loading="eager" decoding="async">
       <h1>Eric Li</h1>
-      <div class="loc">Palo Alto, CA</div>
+      <!-- Location removed -->
     </div>
 
     <p class="bio">
@@ -127,7 +125,7 @@
       <article class="piece">
         <h2>Everyone Wants to Trade Everything</h2>
         <div class="url">
-          <a href="https://x.com/ericli1_/status/1962105026052006032" target="_blank" rel="noopener">
+          <a href="https://x.com/ericli1_/status/1962105026052006032" target="_blank" rel="noopener noreferrer">
             x.com/ericli1_/status/1962105026052006032
           </a>
         </div>
@@ -136,7 +134,7 @@
       <article class="piece">
         <h2>Do Prediction Markets Predict?</h2>
         <div class="url">
-          <a href="https://x.com/ericli1_/status/1966220771501527203" target="_blank" rel="noopener">
+          <a href="https://x.com/ericli1_/status/1966220771501527203" target="_blank" rel="noopener noreferrer">
             x.com/ericli1_/status/1966220771501527203
           </a>
         </div>
@@ -145,7 +143,7 @@
       <article class="piece">
         <h2>“If You Want Peace, You Must Prepare for War”</h2>
         <div class="url">
-          <a href="https://x.com/ericli1_/status/1972784924374774125" target="_blank" rel="noopener">
+          <a href="https://x.com/ericli1_/status/1972784924374774125" target="_blank" rel="noopener noreferrer">
             x.com/ericli1_/status/1972784924374774125
           </a>
         </div>
@@ -155,10 +153,10 @@
 
   <footer>
     <div class="footwrap" aria-label="Contact">
-      <a class="left"  href="mailto:erli@x.ai">erli@x.ai</a>
+      <a class="left"  href="https://mail.google.com/mail/?view=cm&fs=1&to=erli@x.ai" target="_blank" rel="noopener noreferrer">erli@x.ai</a>
       <span class="dot">·</span>
-      <a class="right" href="mailto:eric_li1@college.harvard.edu">eric_li1@college.harvard.edu</a>
+      <a class="right" href="https://mail.google.com/mail/?view=cm&fs=1&to=eric_li1@college.harvard.edu" target="_blank" rel="noopener noreferrer">eric_li1@college.harvard.edu</a>
     </div>
   </footer>
 </body>
-</html>
+</html>  
