@@ -19,21 +19,21 @@
       --stack:640px;
       --u:8px;
       --top:56px;
-      --footer-up:16px;     /* ↓ moved emails a bit lower */
+      --footer-up:16px;       /* lower = closer to bottom */
 
       /* type scale */
       --body:18px;
-      --h1:36px;            /* ↑ a bit bigger */
-      --loc:18px;           /* ↑ a bit bigger */
-      --bio:18px;
+      --h1:40px;              /* bigger name */
+      --loc:20px;             /* bigger location */
+      --bio:18px;             /* “tinge smaller” than original 20 */
       --title:20px;
       --url:14px;
 
       /* media */
-      --hero-size:clamp(220px, 35vw, 360px);
+      --hero-size:clamp(240px, 36vw, 380px);
 
       /* footer */
-      --email-gap:12px;
+      --email-gap:12px;       /* spacing around centered dot */
     }
 
     *{box-sizing:border-box;margin:0;padding:0}
@@ -52,7 +52,7 @@
       padding:0 16px;
     }
 
-    /* Masthead (centered block) */
+    /* Masthead */
     .masthead{ text-align:center; }
     #hero{display:block;margin:0 auto calc(2*var(--u));width:var(--hero-size);height:auto}
     h1{font-weight:600;font-size:var(--h1);letter-spacing:.2px;margin-bottom:var(--u)}
@@ -79,9 +79,9 @@
 
     /* Links: underline only on hover */
     a, a:visited, a:active{color:inherit;text-decoration:none}
-    a:hover, a:focus{text-decoration:underline;text-underline-offset:2px}
+    a:hover, a:focus{text-decoration:underline; text-underline-offset:2px}
 
-    /* Footer pinned low, dot truly centered on the page */
+    /* Footer with dot truly centered on page */
     footer{
       position:fixed; left:0; right:0;
       bottom:calc(var(--footer-up) + env(safe-area-inset-bottom, 0px));
