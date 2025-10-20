@@ -16,7 +16,8 @@
       --paper:#fff;
 
       --body:19px;
-      --hero-size:clamp(300px, 60vmin, 640px);
+      /* image just a tinge bigger */
+      --hero-size:clamp(310px, 62vmin, 660px);
 
       /* footer/contacts sizing */
       --contact-size:clamp(20px, 2.8vw, 30px);
@@ -71,8 +72,8 @@
 
     footer{
       margin-top:auto;
-      /* keeps it lower without pinning to the edge */
-      margin-bottom: clamp(32px, 10vh, 128px);
+      /* shift the X up a tinge by increasing bottom margin */
+      margin-bottom: clamp(36px, 12vh, 136px);
       padding:6px 16px 0;
       font-size:var(--contact-size);
     }
@@ -89,12 +90,12 @@
       display:flex; align-items:center; justify-content:center;
     }
 
-    /* make the 𝕏 modestly larger than the base footer size */
+    /* 𝕏 just a little bigger than before */
     .xlink{
       font-family: system-ui, -apple-system, "Segoe UI", "Segoe UI Symbol",
                    "Noto Sans Math", "Apple Symbols", Roboto, sans-serif;
       display:inline-block;
-      font-size: calc(var(--contact-size) * 1.3);
+      font-size: calc(var(--contact-size) * 1.4);
       line-height:1;
     }
     .xlink:focus-visible{
