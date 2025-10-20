@@ -18,23 +18,24 @@
       /* rhythm */
       --u:8px;
 
-      /* type scale (larger) */
+      /* type scale */
       --body:22px;
-      --h1:64px;                 /* bigger name */
-      --footer-size:20px;        /* bigger emails */
-      --social-size:24px;        /* bigger 𝕏 */
-      
+
+      /* bigger footer items */
+      --footer-size:clamp(22px, 2.4vw, 28px);
+      --social-size:clamp(28px, 3vw, 36px);
+
       /* media */
       --hero-size:clamp(360px, 48vw, 620px);
 
       /* footer spacing */
-      --email-gap:12px;          /* space around the centered dot */
+      --email-gap:14px;
     }
 
     *{box-sizing:border-box;margin:0;padding:0}
     html,body{height:100%}
     body{
-      min-height:100svh;         /* safe viewport height */
+      min-height:100svh;
       display:flex; flex-direction:column;
       background:var(--paper); color:var(--ink);
       font-family:'Cormorant Garamond',serif;
@@ -44,40 +45,38 @@
       padding-bottom:env(safe-area-inset-bottom,0px);
     }
 
-    /* Center the masthead in the available space */
     main{
       flex:1;
       display:flex; align-items:center; justify-content:center;
-      padding:clamp(24px, 6vh, 64px) 16px;   /* breathing room */
+      padding:clamp(24px, 6vh, 64px) 16px;
     }
-    .masthead{ text-align:center; max-width:680px; }
+    .masthead{ text-align:center; max-width:680px; width:100%; }
     #hero{
       display:block; width:var(--hero-size); height:auto;
-      margin:0 auto clamp(18px, 3.2vh, 28px); /* more gap to name */
+      margin:0 auto clamp(12px, 2.6vh, 20px);
     }
-    h1{
-      font-weight:600; font-size:var(--h1);
-      letter-spacing:.2px;
-    }
+
     a, a:visited, a:active{color:inherit;text-decoration:none}
     a:hover, a:focus{text-decoration:underline; text-underline-offset:2px}
 
-    /* Footer pinned to bottom via flex (no absolute math) */
+    /* Footer pinned to bottom, but visually lifted a bit */
     footer{
       margin-top:auto;
-      padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));
+      margin-bottom:clamp(12px, 6vh, 56px); /* lift it up */
+      padding:10px 16px 0;
       font-size:var(--footer-size);
     }
     .footwrap{
       display:flex; flex-direction:column; align-items:center;
-      row-gap:8px;
+      row-gap:12px;
       width:100%;
+      max-width:680px;           /* match hero width */
+      margin:0 auto;             /* center the whole strip */
     }
 
-    /* Big centered 𝕏 */
     .xlink{ font-size:var(--social-size); line-height:1; }
 
-    /* Emails row: dot perfectly centered to viewport */
+    /* Emails row */
     .emails{
       display:grid;
       grid-template-columns:1fr auto 1fr;
@@ -89,7 +88,6 @@
     .emails .right { justify-self:start;}
     .emails .dot   { justify-self:center; opacity:.6; pointer-events:none; }
 
-    /* Small screens: keep it graceful */
     @media (max-width:520px){
       .emails{ row-gap:6px; }
     }
@@ -99,11 +97,7 @@
   <main>
     <div class="masthead">
       <img id="hero" src="IMG_0429.jpeg" alt="Eric Li" loading="eager" decoding="async">
-      <h1>
-        <a href="https://www.linkedin.com/in/eric-li-226850249" target="_blank" rel="noopener noreferrer">
-          Eric Li
-        </a>
-      </h1>
+      <!-- removed the H1 -->
     </div>
   </main>
 
