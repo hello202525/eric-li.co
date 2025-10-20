@@ -16,11 +16,14 @@
       --paper:#fff;
 
       --body:19px;
-      /* bigger image */
+      /* bigger image from last step */
       --hero-size:clamp(340px, 70vmin, 760px);
 
       /* footer/contacts sizing */
       --contact-size:clamp(20px, 2.8vw, 30px);
+
+      /* width of the divider line under the image */
+      --rule-width: clamp(72px, 18vmin, 220px);
     }
 
     *{box-sizing:border-box;margin:0;padding:0}
@@ -69,9 +72,19 @@
     #hero{
       display:block;
       width:100%;
-      max-width:var(--hero-size); /* prevents overflow on small screens */
+      max-width:var(--hero-size);
       height:auto;
       margin:0 auto clamp(12px, 2.2vh, 18px);
+    }
+
+    /* the thin line under the image */
+    .rule{
+      width:var(--rule-width);
+      height:1px;
+      margin:clamp(8px, 1.8vh, 16px) auto 0;
+      background:currentColor;
+      opacity:.25;              /* subtle */
+      border-radius:1px;        /* crisp on HiDPI */
     }
 
     a, a:visited, a:active{color:inherit;text-decoration:none}
@@ -126,6 +139,7 @@
          aria-label="Watch on YouTube">
         <img id="hero" src="IMG_0442.jpeg" alt="Eric Li" loading="eager" decoding="async">
       </a>
+      <div class="rule" aria-hidden="true"></div>
     </div>
   </main>
 
