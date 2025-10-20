@@ -18,14 +18,8 @@
       --body:19px;
       --hero-size:clamp(300px, 60vmin, 640px);
 
-      /* contact line */
+      /* footer/contacts sizing */
       --contact-size:clamp(20px, 2.8vw, 30px);
-
-      /* spacing around center dots */
-      --group-gap: clamp(.6ch, 1.3vw, 1.2ch);
-
-      /* tiny shrink to make 𝕏 match cap height */
-      --x-tweak: 0.965; /* 96.5% of text size */
     }
 
     *{box-sizing:border-box;margin:0;padding:0}
@@ -39,6 +33,17 @@
       line-height:1.45;
       -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
       padding-bottom:env(safe-area-inset-bottom,0px);
+    }
+
+    /* top-right email block */
+    .emails{
+      position:fixed;
+      top:clamp(10px, 3vh, 24px);
+      right:clamp(10px, 3vw, 24px);
+      z-index:2;
+      text-align:right;
+      display:flex; flex-direction:column; gap:4px;
+      font-size:clamp(14px, 1.6vw, 18px);
     }
 
     main{
@@ -66,7 +71,7 @@
 
     footer{
       margin-top:auto;
-      /* lowered a bit toward the bottom (was much higher before) */
+      /* keeps it lower without pinning to the edge */
       margin-bottom: clamp(32px, 10vh, 128px);
       padding:6px 16px 0;
       font-size:var(--contact-size);
@@ -79,37 +84,33 @@
       text-align:center;
     }
 
-    /* Grid ensures "xAI" sits on the physical center of the page */
+    /* Only a centered 𝕏 */
     .contact{
-      display:grid;
-      grid-template-columns: 1fr auto auto auto 1fr; /* L · CENTER · R */
-      align-items:baseline;
-      column-gap: var(--group-gap);
-      letter-spacing:.01em;
-      white-space:nowrap; /* keep the trio on one line so centering holds */
-    }
-    .left  { justify-self:end; }
-    .center{ justify-self:center; }
-    .right { justify-self:start; }
-
-    .sep{
-      margin:0; /* grid gap handles spacing */
-      line-height:1;
-      opacity:.75;
-      user-select:none;
+      display:flex; align-items:center; justify-content:center;
     }
 
-    /* make the 𝕏 render consistently and slightly smaller */
+    /* make the 𝕏 modestly larger than the base footer size */
     .xlink{
       font-family: system-ui, -apple-system, "Segoe UI", "Segoe UI Symbol",
                    "Noto Sans Math", "Apple Symbols", Roboto, sans-serif;
       display:inline-block;
-      font-size: calc(1em * var(--x-tweak));
+      font-size: calc(var(--contact-size) * 1.3);
       line-height:1;
+    }
+    .xlink:focus-visible{
+      outline:2px solid currentColor;
+      outline-offset:6px;
+      border-radius:6px;
     }
   </style>
 </head>
 <body>
+  <!-- top-right emails -->
+  <div class="emails" aria-label="Email">
+    <a href="mailto:erli@x.ai">erli@x.ai</a>
+    <a href="mailto:eric_li1@college.harvard.edu">eric_li1@college.harvard.edu</a>
+  </div>
+
   <main>
     <div class="masthead">
       <a class="hero-link" href="https://www.youtube.com/watch?v=2hSdEkDe87s"
@@ -123,11 +124,7 @@
   <footer>
     <div class="footwrap" aria-label="Contact & Social">
       <div class="contact">
-        <a class="xlink left" href="https://x.com/@ericli1_" target="_blank" rel="noopener noreferrer">𝕏</a>
-        <span class="sep" aria-hidden="true">·</span>
-        <a class="center" href="https://mail.google.com/mail/?view=cm&fs=1&to=erli@x.ai" target="_blank" rel="noopener noreferrer">xAI</a>
-        <span class="sep" aria-hidden="true">·</span>
-        <a class="right" href="https://mail.google.com/mail/?view=cm&fs=1&to=eric_li1@college.harvard.edu" target="_blank" rel="noopener noreferrer">H</a>
+        <a class="xlink" href="https://x.com/@ericli1_" target="_blank" rel="noopener noreferrer">𝕏</a>
       </div>
     </div>
   </footer>
