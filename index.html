@@ -16,13 +16,8 @@
       --paper:#fff;
 
       --body:19px;
-      /* bigger image from last step */
       --hero-size:clamp(340px, 70vmin, 760px);
-
-      /* footer/contacts sizing */
       --contact-size:clamp(20px, 2.8vw, 30px);
-
-      /* width of the divider line under the image */
       --rule-width: clamp(72px, 18vmin, 220px);
     }
 
@@ -39,7 +34,6 @@
       padding-bottom:env(safe-area-inset-bottom,0px);
     }
 
-    /* top-right email block */
     .emails{
       position:fixed;
       top:clamp(10px, 3vh, 24px);
@@ -55,13 +49,11 @@
       display:flex; align-items:center; justify-content:center;
       padding:clamp(18px, 5vh, 40px) 16px;
     }
-    /* keep image slightly below exact center */
     .masthead{
       text-align:center; max-width:680px; width:100%;
       transform: translateY(clamp(4px, 1.2vh, 14px));
     }
 
-    /* clickable hero link + focus style */
     .hero-link{ display:inline-block }
     .hero-link:focus-visible{
       outline:2px solid currentColor;
@@ -77,14 +69,13 @@
       margin:0 auto clamp(12px, 2.2vh, 18px);
     }
 
-    /* the thin line under the image */
     .rule{
       width:var(--rule-width);
       height:1px;
       margin:clamp(8px, 1.8vh, 16px) auto 0;
       background:currentColor;
-      opacity:.25;              /* subtle */
-      border-radius:1px;        /* crisp on HiDPI */
+      opacity:.25;
+      border-radius:1px;
     }
 
     a, a:visited, a:active{color:inherit;text-decoration:none}
@@ -92,7 +83,6 @@
 
     footer{
       margin-top:auto;
-      /* keep the footer link slightly higher on the page */
       margin-bottom: clamp(40px, 13vh, 144px);
       padding:6px 16px 0;
       font-size:var(--contact-size);
@@ -105,12 +95,11 @@
       text-align:center;
     }
 
-    /* Centered footer link */
     .contact{
       display:flex; align-items:center; justify-content:center;
     }
 
-    /* "Writing" matches the email font size */
+    /* Matches the email font size */
     .writing-link{
       display:inline-block;
       font-size:clamp(14px, 1.6vw, 18px);
@@ -124,7 +113,6 @@
   </style>
 </head>
 <body>
-  <!-- top-right emails -->
   <div class="emails" aria-label="Email">
     <a href="mailto:erli@x.ai">erli@x.ai</a>
     <a href="mailto:eric_li1@college.harvard.edu">eric_li1@college.harvard.edu</a>
@@ -144,8 +132,7 @@
   <footer>
     <div class="footwrap" aria-label="Contact & Social">
       <div class="contact">
-        <!-- Replace the href with your actual writing URL -->
-        <a class="writing-link" href="/writing" target="_blank" rel="noopener noreferrer">Writing</a>
+        <a class="writing-link" href="https://x.com/@ericli1_" target="_blank" rel="noopener noreferrer">Writing</a>
       </div>
     </div>
   </footer>
