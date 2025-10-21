@@ -92,7 +92,7 @@
 
     footer{
       margin-top:auto;
-      /* keep the X slightly higher on the page */
+      /* keep the footer link slightly higher on the page */
       margin-bottom: clamp(40px, 13vh, 144px);
       padding:6px 16px 0;
       font-size:var(--contact-size);
@@ -105,20 +105,18 @@
       text-align:center;
     }
 
-    /* Only a centered 𝕏 */
+    /* Centered footer link */
     .contact{
       display:flex; align-items:center; justify-content:center;
     }
 
-    /* modestly larger 𝕏 */
-    .xlink{
-      font-family: system-ui, -apple-system, "Segoe UI", "Segoe UI Symbol",
-                   "Noto Sans Math", "Apple Symbols", Roboto, sans-serif;
+    /* "Writing" matches the email font size */
+    .writing-link{
       display:inline-block;
-      font-size: calc(var(--contact-size) * 1.4);
+      font-size:clamp(14px, 1.6vw, 18px);
       line-height:1;
     }
-    .xlink:focus-visible{
+    .writing-link:focus-visible{
       outline:2px solid currentColor;
       outline-offset:6px;
       border-radius:6px;
@@ -146,7 +144,8 @@
   <footer>
     <div class="footwrap" aria-label="Contact & Social">
       <div class="contact">
-        <a class="xlink" href="https://x.com/@ericli1_" target="_blank" rel="noopener noreferrer">𝕏</a>
+        <!-- Replace the href with your actual writing URL -->
+        <a class="writing-link" href="/writing" target="_blank" rel="noopener noreferrer">Writing</a>
       </div>
     </div>
   </footer>
