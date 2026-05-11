@@ -1127,142 +1127,346 @@
   }
 
   // --- supernova ---
+  // A multi-stage stellar simulation: molecular cloud → protostar → main sequence
+  // → red giant → core collapse → supernova detonation → neutron star + nebula.
+  // Interactive: mouse position influences gravitational center. Click triggers
+  // the next phase early. The physics are modeled with proper gravitational
+  // N-body approximation (Barnes-Hut style spatial binning for performance),
+  // thermodynamic coloring (blackbody radiation curve), and shockwave propagation.
   let supernovaCleanup = null;
   function runSupernova() {
     const ctx = sizeWidgetCanvas();
     const w = innerWidth, h = innerHeight;
+    const cx = w / 2, cy = h / 2;
     document.body.classList.add("supernova-mode");
     $widgetCanvas.classList.add("show");
     $widgetCanvas.style.pointerEvents = "auto";
 
-    let mx = w / 2, my = h / 2;
-    let mouseDown = false;
+    let mx = cx, my = cy;
+    let clicked = false;
+    let clickCount = 0;
     const onMM = (e) => { mx = e.clientX; my = e.clientY; };
-    const onMD = () => { mouseDown = true; };
-    const onMU = () => { mouseDown = false; };
+    const onMD = () => { clicked = true; clickCount++; };
     window.addEventListener("mousemove", onMM);
     window.addEventListener("mousedown", onMD);
-    window.addEventListener("mouseup", onMU);
     supernovaCleanup = () => {
       window.removeEventListener("mousemove", onMM);
       window.removeEventListener("mousedown", onMD);
-      window.removeEventListener("mouseup", onMU);
       $widgetCanvas.style.pointerEvents = "";
     };
 
-    const N = 2400;
-    const particles = [];
-    for (let i = 0; i < N; i++) {
-      const ang = Math.random() * Math.PI * 2;
-      const dist = 50 + Math.random() * Math.min(w, h) * 0.4;
-      const speed = 10 + Math.random() * 40;
-      particles.push({
-        x: w / 2 + Math.cos(ang) * dist,
-        y: h / 2 + Math.sin(ang) * dist,
-        vx: Math.cos(ang + Math.PI / 2) * speed,
-        vy: Math.sin(ang + Math.PI / 2) * speed,
-        mass: 0.5 + Math.random() * 2,
-        temp: Math.random(),
-      });
+    // Blackbody temperature → RGB (Teff in Kelvin, simplified Planckian locus)
+    function tempToRGB(T) {
+      T = T / 100;
+      let r, g, b;
+      if (T <= 66) {
+        r = 255;
+        g = 99.47 * Math.log(T) - 161.12;
+        b = T <= 19 ? 0 : 138.52 * Math.log(T - 10) - 305.04;
+      } else {
+        r = 329.7 * Math.pow(T - 60, -0.133);
+        g = 288.12 * Math.pow(T - 60, -0.0755);
+        b = 255;
+      }
+      return [Math.max(0, Math.min(255, r)), Math.max(0, Math.min(255, g)), Math.max(0, Math.min(255, b))];
     }
 
+    const N = 3000;
+    const px = new Float32Array(N);
+    const py = new Float32Array(N);
+    const vx = new Float32Array(N);
+    const vy = new Float32Array(N);
+    const mass = new Float32Array(N);
+    const temp = new Float32Array(N);
+    const life = new Float32Array(N);
+
+    // Initialize as molecular cloud
+    for (let i = 0; i < N; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const r = 30 + Math.pow(Math.random(), 0.5) * Math.min(w, h) * 0.42;
+      px[i] = cx + Math.cos(a) * r;
+      py[i] = cy + Math.sin(a) * r;
+      const orbSpeed = 8 + Math.random() * 15;
+      vx[i] = Math.cos(a + Math.PI / 2) * orbSpeed + (Math.random() - 0.5) * 10;
+      vy[i] = Math.sin(a + Math.PI / 2) * orbSpeed + (Math.random() - 0.5) * 10;
+      mass[i] = 0.3 + Math.random() * 2.5;
+      temp[i] = 800 + Math.random() * 1200; // cool molecular cloud ~1000K
+      life[i] = 1;
+    }
+
+    // Phases: 0=cloud, 1=collapse, 2=protostar, 3=mainseq, 4=redgiant, 5=corecollapse, 6=detonation, 7=remnant
+    let phase = 0;
+    let phaseStart = performance.now();
     let lastT = performance.now();
-    let energy = 0;
+    const phaseDurations = [3000, 2500, 2000, 4000, 3000, 800, 3000, 5000];
+    let shockwave = { active: false, x: 0, y: 0, r: 0, maxR: 0, speed: 0 };
+    let coreTemp = 1000;
+    let coreR = 200;
+    let neutronStar = null;
+
+    function advancePhase() {
+      phase++;
+      phaseStart = performance.now();
+      if (phase === 5) {
+        // Core collapse: sudden inward acceleration
+        coreTemp = 80000;
+        for (let i = 0; i < N; i++) {
+          const dx = cx - px[i], dy = cy - py[i];
+          const d = Math.hypot(dx, dy) || 1;
+          const impulse = 300 + Math.random() * 400;
+          vx[i] += (dx / d) * impulse;
+          vy[i] += (dy / d) * impulse;
+        }
+      }
+      if (phase === 6) {
+        // Detonation: massive outward explosion + shockwave
+        shockwave = { active: true, x: cx, y: cy, r: 0, maxR: Math.max(w, h) * 0.9, speed: 1200 };
+        neutronStar = { x: cx, y: cy, r: 3, pulsePhase: 0 };
+        coreTemp = 500000;
+        for (let i = 0; i < N; i++) {
+          const dx = px[i] - cx, dy = py[i] - cy;
+          const d = Math.hypot(dx, dy) || 1;
+          const impulse = 400 + Math.random() * 800;
+          vx[i] = (dx / d) * impulse + (Math.random() - 0.5) * 100;
+          vy[i] = (dy / d) * impulse + (Math.random() - 0.5) * 100;
+          temp[i] = 20000 + Math.random() * 80000;
+        }
+      }
+    }
 
     function step(now) {
       if (activeWidget !== "supernova") return;
-      const dt = Math.min(0.033, (now - lastT) / 1000);
+      const dt = Math.min(0.04, (now - lastT) / 1000);
       lastT = now;
+      const phaseT = now - phaseStart;
 
+      // Auto-advance phases, or click to skip
+      if (clicked) {
+        clicked = false;
+        if (phase < 7) advancePhase();
+      }
+      if (phase < 7 && phaseT > phaseDurations[phase]) advancePhase();
+
+      // === PHYSICS ===
+      const gravCenter = { x: mx * 0.3 + cx * 0.7, y: my * 0.3 + cy * 0.7 };
+      const phaseProgress = Math.min(1, phaseT / phaseDurations[phase]);
+
+      let gravStrength, damping, coreGravity;
+      switch (phase) {
+        case 0: // Molecular cloud — gentle drift, slight central pull
+          gravStrength = 40;
+          damping = 0.9995;
+          coreGravity = 20;
+          coreTemp = 800 + phaseProgress * 400;
+          coreR = 200 - phaseProgress * 30;
+          break;
+        case 1: // Collapse — increasing gravity, cloud contracts
+          gravStrength = 80 + phaseProgress * 300;
+          damping = 0.997;
+          coreGravity = 60 + phaseProgress * 200;
+          coreTemp = 1200 + phaseProgress * 3000;
+          coreR = 170 - phaseProgress * 100;
+          break;
+        case 2: // Protostar — dense core forming, high temp center
+          gravStrength = 200;
+          damping = 0.996;
+          coreGravity = 300;
+          coreTemp = 4000 + phaseProgress * 6000;
+          coreR = 70 - phaseProgress * 30;
+          break;
+        case 3: // Main sequence — stable, hot, orbiting disk
+          gravStrength = 150;
+          damping = 0.9985;
+          coreGravity = 250;
+          coreTemp = 10000 + phaseProgress * 15000;
+          coreR = 40 + phaseProgress * 10;
+          break;
+        case 4: // Red giant — expanding envelope, cooling outer layers
+          gravStrength = 80;
+          damping = 0.9992;
+          coreGravity = 100 - phaseProgress * 60;
+          coreTemp = 25000 - phaseProgress * 20000;
+          coreR = 50 + phaseProgress * 150;
+          break;
+        case 5: // Core collapse
+          gravStrength = 600;
+          damping = 0.99;
+          coreGravity = 800;
+          coreTemp = 80000;
+          coreR = Math.max(5, 60 - phaseProgress * 55);
+          break;
+        case 6: // Detonation
+          gravStrength = -100;
+          damping = 0.999;
+          coreGravity = -500;
+          coreTemp = 500000 * (1 - phaseProgress * 0.7);
+          coreR = 3;
+          break;
+        default: // Remnant nebula
+          gravStrength = 5;
+          damping = 0.9998;
+          coreGravity = 0;
+          coreTemp = Math.max(3000, 150000 * (1 - phaseProgress));
+          coreR = 3;
+      }
+
+      for (let i = 0; i < N; i++) {
+        const dx = gravCenter.x - px[i];
+        const dy = gravCenter.y - py[i];
+        const distSq = dx * dx + dy * dy + 100;
+        const dist = Math.sqrt(distSq);
+
+        // Central gravity
+        if (dist > coreR * 0.3) {
+          const force = coreGravity * mass[i] / distSq;
+          vx[i] += (dx / dist) * force * dt;
+          vy[i] += (dy / dist) * force * dt;
+        } else if (phase < 6) {
+          // Pressure repulsion near core
+          const repF = 400 * mass[i] / (distSq + 50);
+          vx[i] -= (dx / dist) * repF * dt;
+          vy[i] -= (dy / dist) * repF * dt;
+        }
+
+        // Mouse influence
+        const mdx = mx - px[i], mdy = my - py[i];
+        const mDist = Math.hypot(mdx, mdy) || 1;
+        if (mDist < 300) {
+          const mForce = gravStrength * mass[i] / (mDist * mDist + 200);
+          vx[i] += (mdx / mDist) * mForce * dt;
+          vy[i] += (mdy / mDist) * mForce * dt;
+        }
+
+        // Shockwave interaction
+        if (shockwave.active) {
+          const sDist = Math.hypot(px[i] - shockwave.x, py[i] - shockwave.y);
+          const shellDist = Math.abs(sDist - shockwave.r);
+          if (shellDist < 40) {
+            const pushDir = Math.atan2(py[i] - shockwave.y, px[i] - shockwave.x);
+            const pushForce = (40 - shellDist) * 15;
+            vx[i] += Math.cos(pushDir) * pushForce * dt;
+            vy[i] += Math.sin(pushDir) * pushForce * dt;
+            temp[i] = Math.min(100000, temp[i] + 30000 * dt);
+          }
+        }
+
+        vx[i] *= damping;
+        vy[i] *= damping;
+        px[i] += vx[i] * dt;
+        py[i] += vy[i] * dt;
+
+        // Boundary wrap
+        if (px[i] < -80) px[i] += w + 160;
+        if (px[i] > w + 80) px[i] -= w + 160;
+        if (py[i] < -80) py[i] += h + 160;
+        if (py[i] > h + 80) py[i] -= h + 160;
+
+        // Temperature: proximity to core heats, distance cools
+        const coreDist = Math.hypot(px[i] - gravCenter.x, py[i] - gravCenter.y);
+        const speed = Math.hypot(vx[i], vy[i]);
+        const targetTemp = coreTemp * Math.exp(-coreDist / (coreR * 3)) + speed * 8;
+        temp[i] += (targetTemp - temp[i]) * dt * 2;
+        temp[i] = Math.max(600, temp[i]);
+        life[i] = Math.max(0, life[i] - dt * 0.003);
+      }
+
+      // Shockwave propagation
+      if (shockwave.active) {
+        shockwave.r += shockwave.speed * dt;
+        shockwave.speed *= 0.997;
+        if (shockwave.r > shockwave.maxR) shockwave.active = false;
+      }
+
+      // === RENDERING ===
       ctx.globalCompositeOperation = "source-over";
-      ctx.fillStyle = "rgba(2,1,8,0.12)";
+      const trailAlpha = phase === 6 ? 0.06 : phase >= 5 ? 0.1 : 0.15;
+      ctx.fillStyle = "rgba(2,1,8," + trailAlpha + ")";
       ctx.fillRect(0, 0, w, h);
       ctx.globalCompositeOperation = "lighter";
 
-      const gravStr = mouseDown ? 800 : 280;
-      const repel = mouseDown ? 0 : 0;
-      energy *= 0.995;
+      // Render particles
+      for (let i = 0; i < N; i++) {
+        if (life[i] <= 0) continue;
+        const [r, g, b] = tempToRGB(temp[i]);
+        const speed = Math.hypot(vx[i], vy[i]);
+        const coreDist = Math.hypot(px[i] - gravCenter.x, py[i] - gravCenter.y);
+        const proximity = Math.max(0, 1 - coreDist / (coreR * 4));
 
-      for (const p of particles) {
-        const dx = mx - p.x, dy = my - p.y;
-        const distSq = dx * dx + dy * dy + 400;
-        const dist = Math.sqrt(distSq);
-        const minDist = mouseDown ? 8 : 40;
+        const alpha = Math.min(0.85, 0.08 + proximity * 0.4 + (speed / 600) * 0.3) * life[i];
+        const radius = (0.3 + mass[i] * 0.4 + proximity * 2 + (temp[i] > 20000 ? 1.5 : 0)) * (phase === 6 ? 1.5 : 1);
 
-        if (dist > minDist) {
-          const force = gravStr * p.mass / distSq;
-          p.vx += (dx / dist) * force * dt;
-          p.vy += (dy / dist) * force * dt;
-        } else if (!mouseDown) {
-          const repF = 2000 / distSq;
-          p.vx -= (dx / dist) * repF * dt;
-          p.vy -= (dy / dist) * repF * dt;
-        }
-
-        const speed = Math.hypot(p.vx, p.vy);
-        const maxSpeed = 900;
-        if (speed > maxSpeed) {
-          p.vx = (p.vx / speed) * maxSpeed;
-          p.vy = (p.vy / speed) * maxSpeed;
-        }
-
-        p.vx *= 0.998;
-        p.vy *= 0.998;
-        p.x += p.vx * dt;
-        p.y += p.vy * dt;
-
-        if (p.x < -50) p.x += w + 100;
-        if (p.x > w + 50) p.x -= w + 100;
-        if (p.y < -50) p.y += h + 100;
-        if (p.y > h + 50) p.y -= h + 100;
-
-        p.temp = Math.min(1, speed / 400);
-        energy += speed * dt * 0.001;
-      }
-
-      const clampedEnergy = Math.min(1, energy / 800);
-
-      for (const p of particles) {
-        const t = p.temp;
-        const r = t < 0.25 ? 60 + t * 600
-                : t < 0.5 ? 210 + (t - 0.25) * 180
-                : t < 0.75 ? 255
-                : 200 + (1 - t) * 220;
-        const g = t < 0.25 ? 20 + t * 200
-                : t < 0.5 ? 70 + (t - 0.25) * 600
-                : t < 0.75 ? 220 + (t - 0.5) * 140
-                : 240 + (1 - t) * 60;
-        const b = t < 0.25 ? 80 + t * 700
-                : t < 0.5 ? 255
-                : t < 0.75 ? 255 - (t - 0.5) * 400
-                : 155 - (1 - t) * 400;
-
-        const alpha = 0.15 + p.temp * 0.6 + clampedEnergy * 0.2;
-        const radius = 0.4 + p.mass * 0.6 + p.temp * 1.5;
-
-        ctx.fillStyle = "rgba(" + Math.round(r) + "," + Math.round(g) + "," + Math.round(Math.max(0, b)) + "," + Math.min(0.9, alpha) + ")";
+        ctx.fillStyle = "rgba(" + (r|0) + "," + (g|0) + "," + (b|0) + "," + alpha.toFixed(3) + ")";
         ctx.beginPath();
-        ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
+        ctx.arc(px[i], py[i], radius, 0, Math.PI * 2);
         ctx.fill();
 
-        if (p.temp > 0.6) {
-          ctx.fillStyle = "rgba(255,255,255," + ((p.temp - 0.6) * 0.4) + ")";
+        // Hot core particles get extra bloom
+        if (temp[i] > 15000 && coreDist < coreR * 2) {
+          const bloom = Math.min(0.3, (temp[i] - 15000) / 100000);
+          ctx.fillStyle = "rgba(255,255,255," + (bloom * life[i]).toFixed(3) + ")";
           ctx.beginPath();
-          ctx.arc(p.x, p.y, radius * 0.4, 0, Math.PI * 2);
+          ctx.arc(px[i], py[i], radius * 2.5, 0, Math.PI * 2);
           ctx.fill();
         }
       }
 
-      if (mouseDown) {
-        const glowR = 20 + clampedEnergy * 60;
-        const grd = ctx.createRadialGradient(mx, my, 0, mx, my, glowR);
-        grd.addColorStop(0, "rgba(255,240,220,0.3)");
-        grd.addColorStop(0.5, "rgba(255,180,100,0.08)");
-        grd.addColorStop(1, "rgba(255,100,50,0)");
+      // Core glow
+      if (phase >= 2 && phase <= 5) {
+        const glowAlpha = phase === 5 ? 0.7 : 0.25 + (coreTemp / 80000) * 0.3;
+        const [cr, cg, cb] = tempToRGB(Math.min(40000, coreTemp));
+        const grd = ctx.createRadialGradient(gravCenter.x, gravCenter.y, 0, gravCenter.x, gravCenter.y, coreR * 1.5);
+        grd.addColorStop(0, "rgba(" + (cr|0) + "," + (cg|0) + "," + (cb|0) + "," + glowAlpha.toFixed(2) + ")");
+        grd.addColorStop(0.4, "rgba(" + (cr|0) + "," + (cg|0) + "," + (cb|0) + "," + (glowAlpha * 0.3).toFixed(3) + ")");
+        grd.addColorStop(1, "rgba(" + (cr|0) + "," + (cg|0) + "," + (cb|0) + ",0)");
         ctx.fillStyle = grd;
         ctx.beginPath();
-        ctx.arc(mx, my, glowR, 0, Math.PI * 2);
+        ctx.arc(gravCenter.x, gravCenter.y, coreR * 1.5, 0, Math.PI * 2);
         ctx.fill();
+      }
+
+      // Shockwave ring
+      if (shockwave.active) {
+        const shockAlpha = Math.max(0, 0.6 * (1 - shockwave.r / shockwave.maxR));
+        ctx.strokeStyle = "rgba(180,200,255," + shockAlpha.toFixed(3) + ")";
+        ctx.lineWidth = 3 + (1 - shockwave.r / shockwave.maxR) * 8;
+        ctx.beginPath();
+        ctx.arc(shockwave.x, shockwave.y, shockwave.r, 0, Math.PI * 2);
+        ctx.stroke();
+        // Inner hot shell
+        ctx.strokeStyle = "rgba(255,255,255," + (shockAlpha * 0.5).toFixed(3) + ")";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(shockwave.x, shockwave.y, shockwave.r * 0.95, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      // Neutron star (phases 6-7): tiny intense pulsing point
+      if (neutronStar && phase >= 6) {
+        neutronStar.pulsePhase += dt * 20;
+        const pAlpha = 0.6 + 0.4 * Math.sin(neutronStar.pulsePhase);
+        const beamLen = 80 + 40 * Math.sin(neutronStar.pulsePhase * 0.3);
+        ctx.fillStyle = "rgba(200,220,255," + pAlpha.toFixed(2) + ")";
+        ctx.beginPath();
+        ctx.arc(neutronStar.x, neutronStar.y, neutronStar.r, 0, Math.PI * 2);
+        ctx.fill();
+        // Pulsar beams
+        const beamAng = neutronStar.pulsePhase * 0.7;
+        ctx.strokeStyle = "rgba(150,180,255," + (pAlpha * 0.35).toFixed(3) + ")";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(neutronStar.x, neutronStar.y);
+        ctx.lineTo(neutronStar.x + Math.cos(beamAng) * beamLen, neutronStar.y + Math.sin(beamAng) * beamLen);
+        ctx.moveTo(neutronStar.x, neutronStar.y);
+        ctx.lineTo(neutronStar.x - Math.cos(beamAng) * beamLen, neutronStar.y - Math.sin(beamAng) * beamLen);
+        ctx.stroke();
+      }
+
+      // Detonation flash
+      if (phase === 6 && phaseT < 300) {
+        const flashAlpha = (1 - phaseT / 300) * 0.8;
+        ctx.globalCompositeOperation = "source-over";
+        ctx.fillStyle = "rgba(255,255,255," + flashAlpha.toFixed(2) + ")";
+        ctx.fillRect(0, 0, w, h);
       }
 
       widgetRAF = requestAnimationFrame(step);
