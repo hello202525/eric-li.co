@@ -1127,15 +1127,18 @@
     $widgetCanvas.style.pointerEvents = "auto";
 
     let mx = cx, my = cy;
+    let mouseDown = false;
     let clicked = false;
-    let clickCount = 0;
     const onMM = (e) => { mx = e.clientX; my = e.clientY; };
-    const onMD = () => { clicked = true; clickCount++; };
+    const onMD = () => { mouseDown = true; clicked = true; };
+    const onMU = () => { mouseDown = false; };
     window.addEventListener("mousemove", onMM);
     window.addEventListener("mousedown", onMD);
+    window.addEventListener("mouseup", onMU);
     supernovaCleanup = () => {
       window.removeEventListener("mousemove", onMM);
       window.removeEventListener("mousedown", onMD);
+      window.removeEventListener("mouseup", onMU);
       $widgetCanvas.style.pointerEvents = "";
     };
 
@@ -1224,15 +1227,29 @@
       lastT = now;
       const phaseT = now - phaseStart;
 
-      // Auto-advance phases, or click to skip
+      // Auto-advance phases, or click to skip with a burst
       if (clicked) {
         clicked = false;
-        if (phase < 7) advancePhase();
+        if (phase < 7) {
+          // Impulse burst toward mouse on click
+          for (let i = 0; i < N; i++) {
+            const dx = mx - px[i], dy = my - py[i];
+            const d = Math.hypot(dx, dy) || 1;
+            if (d < 400) {
+              const impulse = (400 - d) * 0.8;
+              vx[i] += (dx / d) * impulse;
+              vy[i] += (dy / d) * impulse;
+              temp[i] = Math.min(100000, temp[i] + 5000);
+            }
+          }
+          advancePhase();
+        }
       }
       if (phase < 7 && phaseT > phaseDurations[phase]) advancePhase();
 
       // === PHYSICS ===
-      const gravCenter = { x: mx * 0.3 + cx * 0.7, y: my * 0.3 + cy * 0.7 };
+      const mouseWeight = mouseDown ? 0.7 : 0.4;
+      const gravCenter = { x: mx * mouseWeight + cx * (1 - mouseWeight), y: my * mouseWeight + cy * (1 - mouseWeight) };
       const phaseProgress = Math.min(1, phaseT / phaseDurations[phase]);
 
       let gravStrength, damping, coreGravity;
@@ -1312,11 +1329,14 @@
           vy[i] -= (dy / dist) * repF * dt;
         }
 
-        // Mouse influence
+        // Mouse influence — strong direct pull/push
         const mdx = mx - px[i], mdy = my - py[i];
         const mDist = Math.hypot(mdx, mdy) || 1;
-        if (mDist < 300) {
-          const mForce = gravStrength * mass[i] / (mDist * mDist + 200);
+        const mRadius = mouseDown ? 500 : 350;
+        if (mDist < mRadius) {
+          const falloff = 1 - mDist / mRadius;
+          const mStr = mouseDown ? gravStrength * 3 : gravStrength * 1.5;
+          const mForce = mStr * mass[i] * falloff * falloff / (mDist + 20);
           vx[i] += (mdx / mDist) * mForce * dt;
           vy[i] += (mdy / mDist) * mForce * dt;
         }
