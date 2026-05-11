@@ -817,6 +817,7 @@
 
   function clearWidget() {
     clearTimeout(widgetTimer);
+    clearTimeout(voidRevealTimer);
     cancelAnimationFrame(widgetRAF);
     activeWidget = "";
     $widget.classList.remove("show");
@@ -909,9 +910,11 @@
   }
 
   // --- void ---
+  let voidRevealTimer = 0;
   function runVoid() {
     document.body.classList.add("void-mode");
-    setTimeout(() => {
+    voidRevealTimer = setTimeout(() => {
+      if (activeWidget !== "void") return;
       $widget.innerHTML = '<div style="color:rgba(232,230,223,0.7);font-family:\'Iowan Old Style\',Georgia,serif;font-size:clamp(28px,2.8vw,36px);letter-spacing:0.08em;font-style:italic;opacity:0;transition:opacity 2s ease">In the void is virtue, and no evil</div>';
       $widget.classList.add("show");
       requestAnimationFrame(() => {
