@@ -225,25 +225,6 @@
     background: #1a1a1a;
   }
 
-  /* ============================================================
-     /studio — paint your own
-     ============================================================ */
-  .studio {
-    position: fixed; inset: 0;
-    background: var(--paper);
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 500ms ease;
-    z-index: 11;
-  }
-  .studio.show { opacity: 1; pointer-events: auto; }
-  .studio canvas {
-    width: 100%;
-    height: 100%;
-    display: block;
-    cursor: crosshair;
-  }
-  .studio .studio-hint { display: none; }
 
   /* ============================================================
      ambience — the cursor leaves a faint mark, only once you've
@@ -366,11 +347,6 @@
   <div class="gallery-grid" id="gallery-grid"></div>
 </section>
 
-<!-- /studio — painting -->
-<section class="studio" id="studio" aria-hidden="true">
-  <canvas id="studio-canvas"></canvas>
-  <div class="studio-hint">paint. esc returns.</div>
-</section>
 
 <!-- the typing whisper -->
 <div class="typer" id="typer" aria-hidden="true"></div>
@@ -443,15 +419,13 @@
   const $workMeta = document.getElementById("work-meta");
   const $gallery = document.getElementById("gallery");
   const $grid    = document.getElementById("gallery-grid");
-  const $studio  = document.getElementById("studio");
-  const $studioCanvas = document.getElementById("studio-canvas");
   const $typer   = document.getElementById("typer");
   const $end     = document.getElementById("end");
 
   // ============================================================
   //   routing
   // ============================================================
-  const ROUTES = new Set(["", "/", "gallery", "studio", ...SLUGS]);
+  const ROUTES = new Set(["", "/", "gallery", ...SLUGS]);
 
   function currentPath() {
     return location.pathname.replace(/^\/+|\/+$/g, "");
@@ -472,7 +446,7 @@
     if (target === "home") {
       // fade out whichever panel is visible, then reveal home underneath
       $home.hidden = false;
-      [$work, $gallery, $studio].forEach(el => {
+      [$work, $gallery].forEach(el => {
         el.style.transition = "";
         el.classList.remove("show");
         el.setAttribute("aria-hidden", "true");
@@ -482,9 +456,9 @@
 
     // panel-to-panel: fade out others, fade in target
     $home.hidden = true;
-    const el = target === "work" ? $work : target === "gallery" ? $gallery : target === "studio" ? $studio : null;
+    const el = target === "work" ? $work : target === "gallery" ? $gallery : null;
     if (!el) return;
-    [$work, $gallery, $studio].forEach(p => {
+    [$work, $gallery].forEach(p => {
       if (p !== el) {
         p.style.transition = "";
         p.classList.remove("show");
@@ -495,7 +469,6 @@
       el.style.transition = "";
       el.classList.add("show");
       el.setAttribute("aria-hidden", "false");
-      if (target === "studio") enableStudio();
     });
   }
 
@@ -518,11 +491,6 @@
       buildGallery();
       document.title = "Gallery  ·  Eric Li";
       showOnly("gallery");
-      return;
-    }
-    if (path === "studio") {
-      document.title = "Studio  ·  Eric Li";
-      showOnly("studio");
       return;
     }
     // home — wipe the unlocked flag so the bare bio loads clean
@@ -679,7 +647,7 @@
   }
 
   const ARTIST_KEYS = Object.keys(ARTIST_PRIMARY);
-  const TYPEABLE = [...new Set([...ARTIST_KEYS, "gallery", "studio"])];
+  const TYPEABLE = [...new Set([...ARTIST_KEYS, "gallery"])];
 
   // widgets — words that fire surprises that aren't tied to art
   const WIDGETS = ["stars", "void", "mirror"];
@@ -1203,68 +1171,6 @@
       });
   }
 
-  // ============================================================
-  //   /studio — paint with a brush of light or ink
-  // ============================================================
-  let studioCtx, sW, sH, studioReady = false;
-  function sizeStudio() {
-    const dpr = Math.max(1, Math.min(2.5, devicePixelRatio || 1));
-    sW = innerWidth; sH = innerHeight;
-    $studioCanvas.width = Math.round(sW * dpr);
-    $studioCanvas.height = Math.round(sH * dpr);
-    $studioCanvas.style.width = sW + "px";
-    $studioCanvas.style.height = sH + "px";
-    studioCtx = $studioCanvas.getContext("2d");
-    studioCtx.setTransform(1, 0, 0, 1, 0, 0);
-    studioCtx.scale(dpr, dpr);
-    // start with paper
-    studioCtx.fillStyle = "#f7f4ec";
-    studioCtx.fillRect(0, 0, sW, sH);
-  }
-  function enableStudio() {
-    if (!studioReady) {
-      sizeStudio();
-      studioReady = true;
-      addEventListener("resize", () => {
-        if (!$studio.classList.contains("show")) return;
-        sizeStudio();
-      });
-      let drawing = false, last = null, lastT = 0;
-      $studioCanvas.addEventListener("pointerdown", (e) => {
-        drawing = true;
-        last = { x: e.clientX, y: e.clientY };
-        lastT = performance.now();
-        $studioCanvas.setPointerCapture(e.pointerId);
-      });
-      $studioCanvas.addEventListener("pointermove", (e) => {
-        if (!drawing) return;
-        const p = { x: e.clientX, y: e.clientY };
-        const now = performance.now();
-        const dt = Math.max(1, now - lastT);
-        const dx = p.x - last.x, dy = p.y - last.y;
-        const speed = Math.hypot(dx, dy) / dt;
-        const w = Math.max(2, 28 - speed * 32);
-        studioCtx.lineCap = "round";
-        studioCtx.lineJoin = "round";
-        studioCtx.strokeStyle = "rgba(17,17,17,0.62)";
-        studioCtx.lineWidth = w;
-        studioCtx.beginPath();
-        studioCtx.moveTo(last.x, last.y);
-        studioCtx.lineTo(p.x, p.y);
-        studioCtx.stroke();
-        // halo
-        studioCtx.strokeStyle = "rgba(17,17,17,0.12)";
-        studioCtx.lineWidth = w * 1.6;
-        studioCtx.beginPath();
-        studioCtx.moveTo(last.x, last.y);
-        studioCtx.lineTo(p.x, p.y);
-        studioCtx.stroke();
-        last = p; lastT = now;
-      });
-      $studioCanvas.addEventListener("pointerup", () => { drawing = false; last = null; });
-      $studioCanvas.addEventListener("pointerleave", () => { drawing = false; last = null; });
-    }
-  }
 
   // ============================================================
   //   global: block image dragging / drag-select rectangles
