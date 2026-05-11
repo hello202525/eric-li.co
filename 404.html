@@ -462,11 +462,7 @@
 
   function render(path) {
     clearTimeout(idleTimer);
-    if (idleActive && $bio) {
-      idleActive = false;
-      $bio.style.transition = "";
-      $bio.style.opacity = "";
-    }
+    if (idleActive) { idleActive = false; }
     if (activeWidget) clearWidget();
     document.body.classList.add("unlocked"); // any non-home page enables ambience too
 
@@ -1010,23 +1006,18 @@
 
   function resetIdle() {
     clearTimeout(idleTimer);
-    if (idleActive && $bio) {
+    if (idleActive) {
       idleActive = false;
-      $bio.style.transition = "opacity 0.6s ease";
-      $bio.style.opacity = "1";
-      setTimeout(() => { $bio.style.transition = ""; }, 600);
+      clearWidget();
     }
     if (!$home.hidden) {
-      idleTimer = setTimeout(startIdle, 60000);
+      idleTimer = setTimeout(startIdle, 15000);
     }
   }
   function startIdle() {
     if ($home.hidden) return;
     idleActive = true;
-    if ($bio) {
-      $bio.style.transition = "opacity 8s ease";
-      $bio.style.opacity = "0";
-    }
+    fireWidget("void");
   }
   addEventListener("mousemove", resetIdle, { passive: true });
   addEventListener("keydown", resetIdle);
@@ -1037,16 +1028,25 @@
   // ============================================================
   if (window.DeviceMotionEvent) {
     let lastShake = 0;
-    addEventListener("devicemotion", (e) => {
+    function onShake(e) {
       const a = e.accelerationIncludingGravity;
       if (!a) return;
       const force = Math.abs(a.x) + Math.abs(a.y) + Math.abs(a.z);
       if (force > 35 && performance.now() - lastShake > 4000) {
         lastShake = performance.now();
-        const kinds = ["stars", "void"];
-        fireWidget(kinds[Math.floor(Math.random() * kinds.length)]);
+        fireWidget("void");
       }
-    }, { passive: true });
+    }
+    if (typeof DeviceMotionEvent.requestPermission === "function") {
+      document.addEventListener("touchstart", function permit() {
+        DeviceMotionEvent.requestPermission().then(s => {
+          if (s === "granted") addEventListener("devicemotion", onShake, { passive: true });
+        }).catch(() => {});
+        document.removeEventListener("touchstart", permit);
+      }, { once: true });
+    } else {
+      addEventListener("devicemotion", onShake, { passive: true });
+    }
   }
 
   // ============================================================
