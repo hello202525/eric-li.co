@@ -977,7 +977,7 @@
     if (!$home.hidden) { idleTimer = setTimeout(startIdle, 15000); }
   }
   function startIdle() {
-    if ($home.hidden) return;
+    if ($home.hidden || activeWidget) return;
     idleActive = true;
     fireWidget("void");
   }
