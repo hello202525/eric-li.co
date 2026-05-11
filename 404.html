@@ -1274,38 +1274,36 @@
       float s2 = fbm(vec3(v_uv.yx * 2.0, u_time * 0.08 + 10.0)) - 0.5;
       vel += vec2(s1, s2) * 0.03;
 
-      // Central energy source
+      // Central energy source — gentle
       float cDist = length(v_uv - vec2(0.5));
-      float feed = exp(-cDist * cDist * 6.0) * 0.01;
+      float feed = exp(-cDist * cDist * 12.0) * 0.004;
       density += feed;
-      temp += feed * 0.8;
+      temp += feed * 0.5;
 
-      // Secondary source points that drift over time
+      // Drifting secondary sources
       vec2 src2 = vec2(0.5 + sin(u_time*0.13)*0.2, 0.5 + cos(u_time*0.17)*0.15);
       float d2 = length(v_uv - src2);
-      density += exp(-d2*d2 * 20.0) * 0.005;
-      temp += exp(-d2*d2 * 20.0) * 0.004;
+      density += exp(-d2*d2 * 30.0) * 0.003;
+      temp += exp(-d2*d2 * 30.0) * 0.002;
 
       vec2 src3 = vec2(0.5 + cos(u_time*0.11)*0.25, 0.5 + sin(u_time*0.19)*0.2);
       float d3 = length(v_uv - src3);
-      density += exp(-d3*d3 * 20.0) * 0.004;
+      density += exp(-d3*d3 * 30.0) * 0.002;
 
       // Buoyancy + lateral wind
       vel.y += temp * 0.025;
       vel.x += sin(v_uv.y * 6.28 + u_time * 0.3) * temp * 0.005;
 
-      // Decay
-      vel *= 0.993;
-      density *= 0.9985;
-      temp *= 0.994;
+      // Decay — aggressive enough to prevent saturation
+      vel *= 0.99;
+      density *= 0.993;
+      temp *= 0.99;
 
-      // Soft formless boundary — noise-dissolved edges
-      float edgeDist = min(min(v_uv.x, 1.0-v_uv.x), min(v_uv.y, 1.0-v_uv.y));
-      float edgeNoise = fbm(vec3(v_uv * 8.0, u_time * 0.15)) * 0.04;
-      float edge = smoothstep(0.0, 0.12 + edgeNoise, edgeDist);
-      vel *= edge;
-      density *= edge;
-      temp *= edge;
+      // No hard boundary — just gentle radial fade from center
+      float fromCenter = length(v_uv - vec2(0.5));
+      float fade = smoothstep(0.7, 0.3, fromCenter);
+      density *= mix(0.99, 1.0, fade);
+      temp *= mix(0.98, 1.0, fade);
 
       fragColor = vec4(vel, max(density,0.0), max(temp,0.0));
     }`;
@@ -1434,10 +1432,6 @@
       vec3 highlights = vec3(1.02, 0.98, 0.95);
       float lum = dot(col, vec3(0.2126, 0.7152, 0.0722));
       col = mix(col + shadows * (1.0 - lum), col * highlights, lum);
-
-      // Vignette
-      float vig = 1.0 - length(v_uv - 0.5) * 0.8;
-      col *= clamp(vig * vig, 0.0, 1.0);
 
       fragColor = vec4(col, 1.0);
     }`;
