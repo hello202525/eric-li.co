@@ -334,6 +334,21 @@
   body.void-mode .home { opacity: 0; transition: opacity 600ms ease; }
   body.void-mode #trail { opacity: 0; }
 
+  /* supernova mode */
+  body.supernova-mode { background: #020108; transition: background 600ms ease; }
+  body.supernova-mode .home { opacity: 0; transition: opacity 400ms ease; }
+  body.supernova-mode #trail { opacity: 0; }
+
+  /* mirror mode */
+  body.mirror-mode { background: #0a0a0a; transition: background 500ms ease; }
+  body.mirror-mode .home { opacity: 0; transition: opacity 400ms ease; }
+  body.mirror-mode #trail { opacity: 0; }
+
+  /* pulse mode */
+  body.pulse-mode { background: #0c0808; transition: background 600ms ease; }
+  body.pulse-mode .home { opacity: 0; transition: opacity 400ms ease; }
+  body.pulse-mode #trail { opacity: 0; }
+
   /* ============================================================
      misc
      ============================================================ */
@@ -694,7 +709,7 @@
   const TYPEABLE = [...new Set([...ARTIST_KEYS, "gallery", "studio"])];
 
   // widgets — words that fire surprises that aren't tied to art
-  const WIDGETS = ["stars", "void"];
+  const WIDGETS = ["stars", "void", "supernova", "mirror", "pulse"];
 
   // year codes — each work's creation year sends you to that work
   const YEARS = {
@@ -740,7 +755,7 @@
       return;
     }
     // immersive modes — only ESC can exit
-    if (activeWidget === "stars") return;
+    if (activeWidget === "stars" || activeWidget === "supernova" || activeWidget === "mirror" || activeWidget === "pulse") return;
     if (k === "Backspace") {
       if (buf.length) {
         buf = buf.slice(0, -1);
@@ -916,6 +931,12 @@
   let widgetTimer = 0;
   let widgetRAF = 0;
   let activeWidget = "";
+  let voidRevealTimer = 0;
+  let mirrorStream = null;
+  let pulseAudioCtx = null;
+  let pulseActivityTimer = 0;
+  let pulseBeatScheduled = 0;
+  let pulseCleanup = null;
 
   function clearWidget() {
     clearTimeout(widgetTimer);
@@ -924,10 +945,22 @@
     activeWidget = "";
     $widget.classList.remove("show");
     $widgetCanvas.classList.remove("show");
-    document.body.classList.remove("stars-mode", "void-mode");
+    document.body.classList.remove("stars-mode", "void-mode", "supernova-mode", "mirror-mode", "pulse-mode");
     $widget.innerHTML = "";
+    if (mirrorStream) {
+      mirrorStream.getTracks().forEach(t => t.stop());
+      mirrorStream = null;
+    }
+    if (pulseAudioCtx) {
+      try { pulseAudioCtx.close(); } catch(e) {}
+      pulseAudioCtx = null;
+    }
+    if (pulseActivityTimer) { clearInterval(pulseActivityTimer); pulseActivityTimer = 0; }
+    if (pulseCleanup) { pulseCleanup(); pulseCleanup = null; }
+    pulseBeatScheduled = 0;
     try {
       const ctx = $widgetCanvas.getContext("2d");
+      ctx.globalCompositeOperation = "source-over";
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, $widgetCanvas.width, $widgetCanvas.height);
     } catch (e) {}
@@ -956,10 +989,10 @@
       runStars();
       return;
     }
-    if (kind === "void") {
-      runVoid();
-      return;
-    }
+    if (kind === "void") { runVoid(); return; }
+    if (kind === "supernova") { runSupernova(); return; }
+    if (kind === "mirror") { runMirror(); return; }
+    if (kind === "pulse") { runPulse(); return; }
   }
 
   // --- stars ---
@@ -1076,7 +1109,6 @@
   }
 
   // --- void ---
-  let voidRevealTimer = 0;
   function runVoid() {
     document.body.classList.add("void-mode");
     voidRevealTimer = setTimeout(() => {
@@ -1091,6 +1123,527 @@
       });
     }, 1500);
     widgetTimer = setTimeout(clearWidget, 8000);
+  }
+
+  // --- supernova ---
+  function runSupernova() {
+    const ctx = sizeWidgetCanvas();
+    const w = innerWidth, h = innerHeight;
+    const cx = w / 2, cy = h / 2;
+    document.body.classList.add("supernova-mode");
+    $widgetCanvas.classList.add("show");
+
+    const N = 1800;
+    const particles = [];
+    for (let i = 0; i < N; i++) {
+      const ang = Math.random() * Math.PI * 2;
+      const dist = 80 + Math.random() * 260;
+      particles.push({
+        x: cx + Math.cos(ang) * dist,
+        y: cy + Math.sin(ang) * dist,
+        vx: (Math.random() - 0.5) * 20,
+        vy: (Math.random() - 0.5) * 20,
+        r: 0.8 + Math.random() * 1.8,
+        hue: 220 + Math.random() * 60,
+        alpha: 0.3 + Math.random() * 0.5,
+      });
+    }
+
+    const start = performance.now();
+    let lastT = start;
+
+    function step(now) {
+      const dt = Math.min(0.05, (now - lastT) / 1000);
+      lastT = now;
+      const t = (now - start) / 1000;
+      const totalDur = 16;
+
+      ctx.globalCompositeOperation = "source-over";
+      ctx.fillStyle = "rgba(2,1,8,0.25)";
+      ctx.fillRect(0, 0, w, h);
+      ctx.globalCompositeOperation = "lighter";
+
+      if (t < 2) {
+        // Phase 1: Nebula — gentle inward drift
+        for (const p of particles) {
+          const dx = cx - p.x, dy = cy - p.y;
+          const dist = Math.hypot(dx, dy) || 1;
+          p.vx += (dx / dist) * 8 * dt;
+          p.vy += (dy / dist) * 8 * dt;
+          p.vx += (Math.random() - 0.5) * 30 * dt;
+          p.vy += (Math.random() - 0.5) * 30 * dt;
+          p.vx *= 0.98;
+          p.vy *= 0.98;
+          p.x += p.vx * dt;
+          p.y += p.vy * dt;
+          ctx.fillStyle = "hsla(" + p.hue + ",60%,60%," + (p.alpha * 0.6) + ")";
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      } else if (t < 4) {
+        // Phase 2: Collapse — accelerate inward
+        const prog = (t - 2) / 2;
+        for (const p of particles) {
+          const dx = cx - p.x, dy = cy - p.y;
+          const dist = Math.hypot(dx, dy) || 1;
+          const force = 60 + prog * 200;
+          p.vx += (dx / dist) * force * dt;
+          p.vy += (dy / dist) * force * dt;
+          p.vx *= 0.95;
+          p.vy *= 0.95;
+          p.x += p.vx * dt;
+          p.y += p.vy * dt;
+          p.hue = 220 + prog * 40;
+          ctx.fillStyle = "hsla(" + p.hue + ",70%,65%," + (p.alpha * (0.6 + prog * 0.3)) + ")";
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.r * (1 - prog * 0.4), 0, Math.PI * 2);
+          ctx.fill();
+        }
+      } else if (t < 4.5) {
+        // Phase 3: Ignition — white flash
+        const prog = (t - 4) / 0.5;
+        const flash = prog < 0.5 ? prog * 2 : 2 - prog * 2;
+        ctx.globalCompositeOperation = "source-over";
+        ctx.fillStyle = "rgba(2,1,8," + (1 - flash * 0.7) + ")";
+        ctx.fillRect(0, 0, w, h);
+        ctx.globalCompositeOperation = "lighter";
+        ctx.fillStyle = "rgba(255,255,240," + (flash * 0.9) + ")";
+        ctx.beginPath();
+        ctx.arc(cx, cy, 20 + flash * 60, 0, Math.PI * 2);
+        ctx.fill();
+        for (const p of particles) {
+          p.x += (cx - p.x) * 0.15;
+          p.y += (cy - p.y) * 0.15;
+          ctx.fillStyle = "rgba(255,250,230," + (p.alpha * flash) + ")";
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.r * 0.5, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      } else if (t < 8) {
+        // Phase 4: Fusion — golden pulsing star
+        const prog = (t - 4.5) / 3.5;
+        const pulse = 1 + 0.15 * Math.sin(t * 8);
+        const starR = (30 + prog * 40) * pulse;
+        ctx.fillStyle = "rgba(255,220,100,0.4)";
+        ctx.beginPath();
+        ctx.arc(cx, cy, starR * 1.8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "rgba(255,240,180,0.7)";
+        ctx.beginPath();
+        ctx.arc(cx, cy, starR, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "rgba(255,255,240,0.9)";
+        ctx.beginPath();
+        ctx.arc(cx, cy, starR * 0.4, 0, Math.PI * 2);
+        ctx.fill();
+        for (const p of particles) {
+          const ang = Math.atan2(p.y - cy, p.x - cx) + dt * (0.5 + prog);
+          const orbitR = 50 + Math.random() * 80 * (1 + prog);
+          p.x += (cx + Math.cos(ang) * orbitR - p.x) * 0.02;
+          p.y += (cy + Math.sin(ang) * orbitR - p.y) * 0.02;
+          p.hue = 30 + Math.random() * 30;
+          ctx.fillStyle = "hsla(" + p.hue + ",90%,70%," + (p.alpha * 0.5) + ")";
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.r * 0.7, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      } else if (t < 10) {
+        // Phase 5: Red giant — expand, shift orange/red
+        const prog = (t - 8) / 2;
+        const starR = 70 + prog * (Math.min(w, h) * 0.3);
+        const pulse = 1 + 0.05 * Math.sin(t * 3);
+        ctx.fillStyle = "rgba(180,60,20,0.25)";
+        ctx.beginPath();
+        ctx.arc(cx, cy, starR * 1.4 * pulse, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "rgba(220,100,30,0.4)";
+        ctx.beginPath();
+        ctx.arc(cx, cy, starR * pulse, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "rgba(255,180,80,0.5)";
+        ctx.beginPath();
+        ctx.arc(cx, cy, starR * 0.5 * pulse, 0, Math.PI * 2);
+        ctx.fill();
+        for (const p of particles) {
+          const ang = Math.atan2(p.y - cy, p.x - cx);
+          const dist = Math.hypot(p.x - cx, p.y - cy);
+          const targetDist = starR * (0.3 + Math.random() * 0.8);
+          p.x += (cx + Math.cos(ang) * targetDist - p.x) * 0.01;
+          p.y += (cy + Math.sin(ang) * targetDist - p.y) * 0.01;
+          p.vx = (Math.random() - 0.5) * 5;
+          p.vy = (Math.random() - 0.5) * 5;
+          p.x += p.vx * dt;
+          p.y += p.vy * dt;
+          ctx.fillStyle = "hsla(" + (10 + Math.random() * 30) + ",80%,55%," + (p.alpha * 0.3) + ")";
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      } else if (t < 12) {
+        // Phase 6: Supernova explosion
+        const prog = (t - 10) / 2;
+        if (prog < 0.1) {
+          ctx.globalCompositeOperation = "source-over";
+          ctx.fillStyle = "rgba(255,255,255," + ((0.1 - prog) * 8) + ")";
+          ctx.fillRect(0, 0, w, h);
+          ctx.globalCompositeOperation = "lighter";
+        }
+        for (const p of particles) {
+          if (prog < 0.15 && p.vx < 100) {
+            const ang = Math.atan2(p.y - cy, p.x - cx) + (Math.random() - 0.5) * 0.5;
+            const speed = 200 + Math.random() * 600;
+            p.vx = Math.cos(ang) * speed;
+            p.vy = Math.sin(ang) * speed;
+            p.hue = 200 + Math.random() * 80;
+          }
+          p.vx *= 0.99;
+          p.vy *= 0.99;
+          p.x += p.vx * dt;
+          p.y += p.vy * dt;
+          const a = p.alpha * (1 - prog * 0.5);
+          ctx.fillStyle = "hsla(" + p.hue + ",70%,70%," + a + ")";
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.r * (1 + prog), 0, Math.PI * 2);
+          ctx.fill();
+        }
+      } else if (t < totalDur) {
+        // Phase 7: Remnant nebula — ring + twinkle
+        const prog = (t - 12) / 4;
+        const fadeOut = prog > 0.7 ? 1 - (prog - 0.7) / 0.3 : 1;
+        for (const p of particles) {
+          p.vx *= 0.96;
+          p.vy *= 0.96;
+          p.x += p.vx * dt;
+          p.y += p.vy * dt;
+          const dist = Math.hypot(p.x - cx, p.y - cy);
+          const ringTarget = 120 + Math.random() * 100;
+          if (dist > 10) {
+            const ang = Math.atan2(p.y - cy, p.x - cx);
+            p.x += (cx + Math.cos(ang) * ringTarget - p.x) * 0.005;
+            p.y += (cy + Math.sin(ang) * ringTarget - p.y) * 0.005;
+          }
+          const twinkle = 0.5 + 0.5 * Math.sin(t * 3 + p.hue);
+          ctx.fillStyle = "hsla(" + p.hue + ",50%,65%," + (p.alpha * 0.4 * twinkle * fadeOut) + ")";
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.r * 0.8, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        for (let i = 0; i < 12; i++) {
+          const sx = cx + (Math.random() - 0.5) * 160;
+          const sy = cy + (Math.random() - 0.5) * 160;
+          const tw = 0.4 + 0.6 * Math.sin(t * 5 + i * 7);
+          ctx.fillStyle = "rgba(255,255,240," + (tw * 0.6 * fadeOut) + ")";
+          ctx.beginPath();
+          ctx.arc(sx, sy, 0.5 + Math.random(), 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      if (t < totalDur) {
+        widgetRAF = requestAnimationFrame(step);
+      } else {
+        clearWidget();
+      }
+    }
+    widgetRAF = requestAnimationFrame(step);
+  }
+
+  // --- mirror ---
+  function runMirror() {
+    document.body.classList.add("mirror-mode");
+    $widgetCanvas.classList.add("show");
+
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: 640, height: 480 } })
+      .then(stream => {
+        if (activeWidget !== "mirror") { stream.getTracks().forEach(t => t.stop()); return; }
+        mirrorStream = stream;
+        const video = document.createElement("video");
+        video.srcObject = stream;
+        video.playsInline = true;
+        video.muted = true;
+        video.play();
+
+        const offscreen = document.createElement("canvas");
+        const ow = 320, oh = 240;
+        offscreen.width = ow;
+        offscreen.height = oh;
+        const octx = offscreen.getContext("2d", { willReadFrequently: true });
+
+        const ctx = sizeWidgetCanvas();
+        const dw = innerWidth, dh = innerHeight;
+
+        function processFrame() {
+          if (activeWidget !== "mirror") return;
+          octx.drawImage(video, 0, 0, ow, oh);
+          const imageData = octx.getImageData(0, 0, ow, oh);
+          const data = imageData.data;
+          const gray = new Float32Array(ow * oh);
+
+          for (let i = 0; i < ow * oh; i++) {
+            const idx = i * 4;
+            gray[i] = data[idx] * 0.299 + data[idx+1] * 0.587 + data[idx+2] * 0.114;
+          }
+
+          const edges = new Float32Array(ow * oh);
+          for (let y = 1; y < oh - 1; y++) {
+            for (let x = 1; x < ow - 1; x++) {
+              const idx = y * ow + x;
+              const gx = -gray[idx-ow-1] - 2*gray[idx-1] - gray[idx+ow-1]
+                         + gray[idx-ow+1] + 2*gray[idx+1] + gray[idx+ow+1];
+              const gy = -gray[idx-ow-1] - 2*gray[idx-ow] - gray[idx-ow+1]
+                         + gray[idx+ow-1] + 2*gray[idx+ow] + gray[idx+ow+1];
+              edges[idx] = Math.min(255, Math.hypot(gx, gy));
+            }
+          }
+
+          ctx.fillStyle = "#0a0a0a";
+          ctx.fillRect(0, 0, dw, dh);
+
+          const scaleX = dw / ow;
+          const scaleY = dh / oh;
+          const threshold = 30;
+
+          for (let y = 0; y < oh; y += 2) {
+            for (let x = 0; x < ow; x += 2) {
+              const e = edges[y * ow + x];
+              if (e > threshold) {
+                const alpha = Math.min(1, (e - threshold) / 120);
+                const noise = Math.random() * 0.3;
+                ctx.fillStyle = "rgba(232,230,223," + (alpha * 0.8 + noise * alpha) + ")";
+                const px = (ow - x) * scaleX;
+                const py = y * scaleY;
+                const sz = 1.2 + alpha * 1.5 + Math.random() * 0.8;
+                ctx.fillRect(px, py, sz, sz);
+              } else if (Math.random() < 0.008) {
+                ctx.fillStyle = "rgba(232,230,223,0.08)";
+                ctx.fillRect((ow - x) * scaleX, y * scaleY, 1, 1);
+              }
+            }
+          }
+
+          // vignette
+          const vgrad = ctx.createRadialGradient(dw/2, dh/2, dw*0.25, dw/2, dh/2, dw*0.7);
+          vgrad.addColorStop(0, "rgba(10,10,10,0)");
+          vgrad.addColorStop(1, "rgba(10,10,10,0.6)");
+          ctx.fillStyle = vgrad;
+          ctx.fillRect(0, 0, dw, dh);
+
+          widgetRAF = requestAnimationFrame(processFrame);
+        }
+        video.addEventListener("loadeddata", () => { processFrame(); });
+      })
+      .catch(() => {
+        $widget.innerHTML = '<div style="color:rgba(232,230,223,0.6);font-family:\'Iowan Old Style\',Georgia,serif;font-size:18px;font-style:italic;opacity:0;transition:opacity 1s ease">no mirror found</div>';
+        $widget.classList.add("show");
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            const d = $widget.querySelector("div");
+            if (d) d.style.opacity = "1";
+          });
+        });
+        widgetTimer = setTimeout(clearWidget, 3000);
+      });
+  }
+
+  // --- pulse ---
+  let pulseBPM = 60;
+  let pulseFlat = false;
+  let pulseStillStart = 0;
+  let pulseECGData = [];
+
+  function runPulse() {
+    document.body.classList.add("pulse-mode");
+    $widgetCanvas.classList.add("show");
+    const ctx = sizeWidgetCanvas();
+    const w = innerWidth, h = innerHeight;
+
+    pulseAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    pulseBPM = 60;
+    pulseFlat = false;
+    pulseStillStart = performance.now();
+    pulseECGData = [];
+
+    const ecgLen = Math.floor(w / 2);
+    for (let i = 0; i < ecgLen; i++) pulseECGData.push(0);
+
+    let lastBeat = 0;
+    let beatPhase = 0;
+
+    function playBeat() {
+      if (activeWidget !== "pulse") return;
+      if (pulseFlat) return;
+      const now = pulseAudioCtx.currentTime;
+      const gain = pulseAudioCtx.createGain();
+      gain.connect(pulseAudioCtx.destination);
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(0.3, now + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+
+      const osc = pulseAudioCtx.createOscillator();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(55, now);
+      osc.frequency.exponentialRampToValueAtTime(35, now + 0.15);
+      osc.connect(gain);
+      osc.start(now);
+      osc.stop(now + 0.15);
+
+      const gain2 = pulseAudioCtx.createGain();
+      gain2.connect(pulseAudioCtx.destination);
+      gain2.gain.setValueAtTime(0, now + 0.09);
+      gain2.gain.linearRampToValueAtTime(0.2, now + 0.11);
+      gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+
+      const osc2 = pulseAudioCtx.createOscillator();
+      osc2.type = "sine";
+      osc2.frequency.setValueAtTime(70, now + 0.09);
+      osc2.frequency.exponentialRampToValueAtTime(40, now + 0.22);
+      osc2.connect(gain2);
+      osc2.start(now + 0.09);
+      osc2.stop(now + 0.22);
+
+      beatPhase = 1;
+    }
+
+    function playFlatline() {
+      if (activeWidget !== "pulse") return;
+      const now = pulseAudioCtx.currentTime;
+      const gain = pulseAudioCtx.createGain();
+      gain.connect(pulseAudioCtx.destination);
+      gain.gain.setValueAtTime(0.12, now);
+      const osc = pulseAudioCtx.createOscillator();
+      osc.type = "sine";
+      osc.frequency.value = 440;
+      osc.connect(gain);
+      osc.start(now);
+      pulseBeatScheduled = osc;
+    }
+
+    function onActivity() {
+      if (activeWidget !== "pulse") return;
+      pulseStillStart = performance.now();
+      if (pulseFlat) {
+        pulseFlat = false;
+        pulseBPM = 120;
+        if (pulseBeatScheduled && pulseBeatScheduled.stop) {
+          try { pulseBeatScheduled.stop(); } catch(e) {}
+        }
+        pulseBeatScheduled = 0;
+        document.body.classList.remove("void-mode");
+        document.body.classList.add("pulse-mode");
+        $widget.innerHTML = "";
+        $widget.classList.remove("show");
+      } else {
+        pulseBPM = Math.min(140, pulseBPM + 8);
+      }
+    }
+
+    const onMove = () => onActivity();
+    const onKey = () => onActivity();
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("keydown", onKey);
+    pulseCleanup = () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("keydown", onKey);
+    };
+
+    const start = performance.now();
+    let lastFrame = start;
+
+    function step(now) {
+      if (activeWidget !== "pulse") {
+        window.removeEventListener("mousemove", onMove);
+        window.removeEventListener("keydown", onKey);
+        return;
+      }
+      const dt = (now - lastFrame) / 1000;
+      lastFrame = now;
+      const elapsed = (now - start) / 1000;
+
+      const stillDur = (now - pulseStillStart) / 1000;
+      if (!pulseFlat) {
+        if (stillDur > 1) pulseBPM = Math.max(40, pulseBPM - 12 * dt);
+        if (stillDur > 10) {
+          pulseFlat = true;
+          pulseBPM = 0;
+          document.body.classList.add("void-mode");
+          playFlatline();
+          setTimeout(() => {
+            if (activeWidget !== "pulse" || !pulseFlat) return;
+            $widget.innerHTML = '<div style="color:rgba(232,230,223,0.7);font-family:\'Iowan Old Style\',Georgia,serif;font-size:clamp(28px,2.8vw,36px);letter-spacing:0.08em;font-style:italic;opacity:0;transition:opacity 2s ease">In the void is virtue, and no evil</div>';
+            $widget.classList.add("show");
+            requestAnimationFrame(() => {
+              requestAnimationFrame(() => {
+                const d = $widget.querySelector("div");
+                if (d) d.style.opacity = "1";
+              });
+            });
+          }, 1500);
+        }
+      }
+
+      const interval = pulseBPM > 0 ? 60 / pulseBPM : 99999;
+      if (!pulseFlat && now - lastBeat > interval * 1000) {
+        lastBeat = now;
+        playBeat();
+      }
+
+      if (beatPhase > 0) {
+        beatPhase -= dt * 8;
+        if (beatPhase < 0) beatPhase = 0;
+      }
+
+      pulseECGData.shift();
+      if (pulseFlat) {
+        pulseECGData.push(0);
+      } else if (beatPhase > 0.7) {
+        pulseECGData.push(0.9);
+      } else if (beatPhase > 0.5) {
+        pulseECGData.push(-0.3);
+      } else if (beatPhase > 0.3) {
+        pulseECGData.push(0.15);
+      } else {
+        pulseECGData.push(0);
+      }
+
+      ctx.fillStyle = "rgba(12,8,8,0.3)";
+      ctx.fillRect(0, 0, w, h);
+
+      // pulse ring
+      if (beatPhase > 0 && !pulseFlat) {
+        const ringR = (1 - beatPhase) * 150;
+        ctx.strokeStyle = "rgba(180,40,40," + (beatPhase * 0.3) + ")";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(w/2, h/2, ringR, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      // ECG line
+      const ecgY = h * 0.7;
+      const ecgH = 60;
+      ctx.strokeStyle = "rgba(200,60,60,0.7)";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      for (let i = 0; i < pulseECGData.length; i++) {
+        const x = (i / pulseECGData.length) * w;
+        const y = ecgY - pulseECGData[i] * ecgH;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+
+      widgetRAF = requestAnimationFrame(step);
+    }
+    widgetRAF = requestAnimationFrame(step);
+
+    pulseActivityTimer = setInterval(() => {
+      if (activeWidget !== "pulse") {
+        clearInterval(pulseActivityTimer);
+        window.removeEventListener("mousemove", onMove);
+        window.removeEventListener("keydown", onKey);
+      }
+    }, 1000);
   }
 
   // ============================================================
