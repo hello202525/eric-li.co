@@ -344,10 +344,6 @@
   body.mirror-mode .home { opacity: 0; transition: opacity 400ms ease; }
   body.mirror-mode #trail { opacity: 0; }
 
-  /* pulse mode */
-  body.pulse-mode { background: #0c0808; transition: background 600ms ease; }
-  body.pulse-mode .home { opacity: 0; transition: opacity 400ms ease; }
-  body.pulse-mode #trail { opacity: 0; }
 
   /* ============================================================
      misc
@@ -709,7 +705,7 @@
   const TYPEABLE = [...new Set([...ARTIST_KEYS, "gallery", "studio"])];
 
   // widgets — words that fire surprises that aren't tied to art
-  const WIDGETS = ["stars", "void", "supernova", "mirror", "pulse"];
+  const WIDGETS = ["stars", "void", "supernova", "mirror"];
 
   // year codes — each work's creation year sends you to that work
   const YEARS = {
@@ -755,7 +751,7 @@
       return;
     }
     // immersive modes — only ESC can exit
-    if (activeWidget === "stars" || activeWidget === "supernova" || activeWidget === "mirror" || activeWidget === "pulse") return;
+    if (activeWidget === "stars" || activeWidget === "supernova" || activeWidget === "mirror") return;
     if (k === "Backspace") {
       if (buf.length) {
         buf = buf.slice(0, -1);
@@ -933,10 +929,6 @@
   let activeWidget = "";
   let voidRevealTimer = 0;
   let mirrorStream = null;
-  let pulseAudioCtx = null;
-  let pulseActivityTimer = 0;
-  let pulseBeatScheduled = 0;
-  let pulseCleanup = null;
 
   function clearWidget() {
     clearTimeout(widgetTimer);
@@ -945,20 +937,13 @@
     activeWidget = "";
     $widget.classList.remove("show");
     $widgetCanvas.classList.remove("show");
-    document.body.classList.remove("stars-mode", "void-mode", "supernova-mode", "mirror-mode", "pulse-mode");
+    document.body.classList.remove("stars-mode", "void-mode", "supernova-mode", "mirror-mode");
     $widget.innerHTML = "";
     if (supernovaCleanup) { supernovaCleanup(); supernovaCleanup = null; }
     if (mirrorStream) {
       mirrorStream.getTracks().forEach(t => t.stop());
       mirrorStream = null;
     }
-    if (pulseAudioCtx) {
-      try { pulseAudioCtx.close(); } catch(e) {}
-      pulseAudioCtx = null;
-    }
-    if (pulseActivityTimer) { clearInterval(pulseActivityTimer); pulseActivityTimer = 0; }
-    if (pulseCleanup) { pulseCleanup(); pulseCleanup = null; }
-    pulseBeatScheduled = 0;
     try {
       const ctx = $widgetCanvas.getContext("2d");
       ctx.globalCompositeOperation = "source-over";
@@ -993,7 +978,6 @@
     if (kind === "void") { runVoid(); return; }
     if (kind === "supernova") { runSupernova(); return; }
     if (kind === "mirror") { runMirror(); return; }
-    if (kind === "pulse") { runPulse(); return; }
   }
 
   // --- stars ---
@@ -1648,207 +1632,6 @@
         });
         widgetTimer = setTimeout(clearWidget, 3000);
       });
-  }
-
-  // --- pulse ---
-  let pulseBPM = 60;
-  let pulseFlat = false;
-  let pulseStillStart = 0;
-  let pulseECGData = [];
-
-  function runPulse() {
-    document.body.classList.add("pulse-mode");
-    $widgetCanvas.classList.add("show");
-    const ctx = sizeWidgetCanvas();
-    const w = innerWidth, h = innerHeight;
-
-    pulseAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    if (pulseAudioCtx.state === "suspended") pulseAudioCtx.resume();
-    pulseBPM = 60;
-    pulseFlat = false;
-    pulseStillStart = performance.now();
-    pulseECGData = [];
-
-    const ecgLen = Math.floor(w / 2);
-    for (let i = 0; i < ecgLen; i++) pulseECGData.push(0);
-
-    let lastBeat = 0;
-    let beatPhase = 0;
-
-    function playBeat() {
-      if (activeWidget !== "pulse") return;
-      if (pulseFlat) return;
-      const now = pulseAudioCtx.currentTime;
-      const gain = pulseAudioCtx.createGain();
-      gain.connect(pulseAudioCtx.destination);
-      gain.gain.setValueAtTime(0, now);
-      gain.gain.linearRampToValueAtTime(0.3, now + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
-
-      const osc = pulseAudioCtx.createOscillator();
-      osc.type = "sine";
-      osc.frequency.setValueAtTime(55, now);
-      osc.frequency.exponentialRampToValueAtTime(35, now + 0.15);
-      osc.connect(gain);
-      osc.start(now);
-      osc.stop(now + 0.15);
-
-      const gain2 = pulseAudioCtx.createGain();
-      gain2.connect(pulseAudioCtx.destination);
-      gain2.gain.setValueAtTime(0, now + 0.09);
-      gain2.gain.linearRampToValueAtTime(0.2, now + 0.11);
-      gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
-
-      const osc2 = pulseAudioCtx.createOscillator();
-      osc2.type = "sine";
-      osc2.frequency.setValueAtTime(70, now + 0.09);
-      osc2.frequency.exponentialRampToValueAtTime(40, now + 0.22);
-      osc2.connect(gain2);
-      osc2.start(now + 0.09);
-      osc2.stop(now + 0.22);
-
-      beatPhase = 1;
-    }
-
-    function playFlatline() {
-      if (activeWidget !== "pulse") return;
-      const now = pulseAudioCtx.currentTime;
-      const gain = pulseAudioCtx.createGain();
-      gain.connect(pulseAudioCtx.destination);
-      gain.gain.setValueAtTime(0.12, now);
-      const osc = pulseAudioCtx.createOscillator();
-      osc.type = "sine";
-      osc.frequency.value = 440;
-      osc.connect(gain);
-      osc.start(now);
-      pulseBeatScheduled = osc;
-    }
-
-    function onActivity() {
-      if (activeWidget !== "pulse") return;
-      pulseStillStart = performance.now();
-      if (pulseFlat) {
-        pulseFlat = false;
-        pulseBPM = 120;
-        if (pulseBeatScheduled && pulseBeatScheduled.stop) {
-          try { pulseBeatScheduled.stop(); } catch(e) {}
-        }
-        pulseBeatScheduled = 0;
-        document.body.classList.remove("void-mode");
-        document.body.classList.add("pulse-mode");
-        $widget.innerHTML = "";
-        $widget.classList.remove("show");
-      } else {
-        pulseBPM = Math.min(140, pulseBPM + 8);
-      }
-    }
-
-    const onMove = () => onActivity();
-    const onKey = () => onActivity();
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("keydown", onKey);
-    pulseCleanup = () => {
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("keydown", onKey);
-    };
-
-    const start = performance.now();
-    let lastFrame = start;
-
-    function step(now) {
-      if (activeWidget !== "pulse") {
-        window.removeEventListener("mousemove", onMove);
-        window.removeEventListener("keydown", onKey);
-        return;
-      }
-      const dt = (now - lastFrame) / 1000;
-      lastFrame = now;
-      const elapsed = (now - start) / 1000;
-
-      const stillDur = (now - pulseStillStart) / 1000;
-      if (!pulseFlat) {
-        if (stillDur > 1) pulseBPM = Math.max(40, pulseBPM - 12 * dt);
-        if (stillDur > 10) {
-          pulseFlat = true;
-          pulseBPM = 0;
-          document.body.classList.add("void-mode");
-          playFlatline();
-          setTimeout(() => {
-            if (activeWidget !== "pulse" || !pulseFlat) return;
-            $widget.innerHTML = '<div style="color:rgba(232,230,223,0.7);font-family:\'Iowan Old Style\',Georgia,serif;font-size:clamp(28px,2.8vw,36px);letter-spacing:0.08em;font-style:italic;opacity:0;transition:opacity 2s ease">In the void is virtue, and no evil</div>';
-            $widget.classList.add("show");
-            requestAnimationFrame(() => {
-              requestAnimationFrame(() => {
-                const d = $widget.querySelector("div");
-                if (d) d.style.opacity = "1";
-              });
-            });
-          }, 1500);
-        }
-      }
-
-      const interval = pulseBPM > 0 ? 60 / pulseBPM : 99999;
-      if (!pulseFlat && now - lastBeat > interval * 1000) {
-        lastBeat = now;
-        playBeat();
-      }
-
-      if (beatPhase > 0) {
-        beatPhase -= dt * 8;
-        if (beatPhase < 0) beatPhase = 0;
-      }
-
-      pulseECGData.shift();
-      if (pulseFlat) {
-        pulseECGData.push(0);
-      } else if (beatPhase > 0.7) {
-        pulseECGData.push(0.9);
-      } else if (beatPhase > 0.5) {
-        pulseECGData.push(-0.3);
-      } else if (beatPhase > 0.3) {
-        pulseECGData.push(0.15);
-      } else {
-        pulseECGData.push(0);
-      }
-
-      ctx.fillStyle = "rgba(12,8,8,0.3)";
-      ctx.fillRect(0, 0, w, h);
-
-      // pulse ring
-      if (beatPhase > 0 && !pulseFlat) {
-        const ringR = (1 - beatPhase) * 150;
-        ctx.strokeStyle = "rgba(180,40,40," + (beatPhase * 0.3) + ")";
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(w/2, h/2, ringR, 0, Math.PI * 2);
-        ctx.stroke();
-      }
-
-      // ECG line
-      const ecgY = h * 0.7;
-      const ecgH = 60;
-      ctx.strokeStyle = "rgba(200,60,60,0.7)";
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      for (let i = 0; i < pulseECGData.length; i++) {
-        const x = (i / pulseECGData.length) * w;
-        const y = ecgY - pulseECGData[i] * ecgH;
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      }
-      ctx.stroke();
-
-      widgetRAF = requestAnimationFrame(step);
-    }
-    widgetRAF = requestAnimationFrame(step);
-
-    pulseActivityTimer = setInterval(() => {
-      if (activeWidget !== "pulse") {
-        clearInterval(pulseActivityTimer);
-        window.removeEventListener("mousemove", onMove);
-        window.removeEventListener("keydown", onKey);
-      }
-    }, 1000);
   }
 
   // ============================================================
