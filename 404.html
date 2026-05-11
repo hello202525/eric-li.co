@@ -89,7 +89,7 @@
   }
 
   /* enchanted state — hovering "beautiful things" */
-  body.enchanted { background: #f0e6c8; }
+  body.enchanted { transition: background 600ms ease; }
   .bio.enchanted {
     color: rgba(17,17,17,0.18);
     transition: color 600ms ease;
@@ -789,7 +789,24 @@
     }
     const letters = $end.querySelectorAll("span");
 
+    const enchantedTones = [
+      "#f0e6c8", // warm parchment
+      "#e8e0d0", // pale linen
+      "#dce4e0", // sage mist
+      "#e0d8e8", // faint lavender
+      "#d8e0e8", // cool steel
+      "#e8dcd0", // blush sand
+      "#d0dce0", // winter sky
+      "#e4ddd0", // raw silk
+      "#d8d8e0", // twilight gray
+      "#e0e4d8", // lichen
+    ];
+    let lastTone = -1;
     $end.addEventListener("mouseenter", () => {
+      let pick = lastTone;
+      while (pick === lastTone) pick = Math.floor(Math.random() * enchantedTones.length);
+      lastTone = pick;
+      document.body.style.background = enchantedTones[pick];
       document.body.classList.add("enchanted");
       if (bioEl) bioEl.classList.add("enchanted");
       letters.forEach(s => {
@@ -800,6 +817,7 @@
       });
     });
     $end.addEventListener("mouseleave", () => {
+      document.body.style.background = "";
       document.body.classList.remove("enchanted");
       if (bioEl) bioEl.classList.remove("enchanted");
       letters.forEach(s => { s.style.transform = ""; });
