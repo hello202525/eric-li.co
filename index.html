@@ -1379,12 +1379,12 @@
 
       // === RENDERING ===
       ctx.globalCompositeOperation = "source-over";
-      const trailAlpha = phase === 6 ? 0.06 : phase >= 5 ? 0.1 : 0.15;
+      const trailAlpha = phase === 6 ? 0.04 : phase === 5 ? 0.08 : phase >= 3 ? 0.12 : 0.18;
       ctx.fillStyle = "rgba(2,1,8," + trailAlpha + ")";
       ctx.fillRect(0, 0, w, h);
       ctx.globalCompositeOperation = "lighter";
 
-      // Render particles
+      // Render particles with velocity streaks
       for (let i = 0; i < N; i++) {
         if (life[i] <= 0) continue;
         const [r, g, b] = tempToRGB(temp[i]);
@@ -1392,81 +1392,160 @@
         const coreDist = Math.hypot(px[i] - gravCenter.x, py[i] - gravCenter.y);
         const proximity = Math.max(0, 1 - coreDist / (coreR * 4));
 
-        const alpha = Math.min(0.85, 0.08 + proximity * 0.4 + (speed / 600) * 0.3) * life[i];
-        const radius = (0.3 + mass[i] * 0.4 + proximity * 2 + (temp[i] > 20000 ? 1.5 : 0)) * (phase === 6 ? 1.5 : 1);
+        const alpha = Math.min(0.9, 0.06 + proximity * 0.5 + (speed / 500) * 0.35) * life[i];
+        const radius = 0.3 + mass[i] * 0.35 + proximity * 1.8;
+
+        // Velocity streak for fast particles
+        if (speed > 80) {
+          const streakLen = Math.min(25, speed * 0.03);
+          const nx = vx[i] / speed, ny = vy[i] / speed;
+          const tailX = px[i] - nx * streakLen;
+          const tailY = py[i] - ny * streakLen;
+          const grad = ctx.createLinearGradient(px[i], py[i], tailX, tailY);
+          grad.addColorStop(0, "rgba(" + (r|0) + "," + (g|0) + "," + (b|0) + "," + (alpha * 0.9).toFixed(3) + ")");
+          grad.addColorStop(1, "rgba(" + (r|0) + "," + (g|0) + "," + (b|0) + ",0)");
+          ctx.strokeStyle = grad;
+          ctx.lineWidth = radius * 1.4;
+          ctx.lineCap = "round";
+          ctx.beginPath();
+          ctx.moveTo(px[i], py[i]);
+          ctx.lineTo(tailX, tailY);
+          ctx.stroke();
+        }
 
         ctx.fillStyle = "rgba(" + (r|0) + "," + (g|0) + "," + (b|0) + "," + alpha.toFixed(3) + ")";
         ctx.beginPath();
         ctx.arc(px[i], py[i], radius, 0, Math.PI * 2);
         ctx.fill();
 
-        // Hot core particles get extra bloom
-        if (temp[i] > 15000 && coreDist < coreR * 2) {
-          const bloom = Math.min(0.3, (temp[i] - 15000) / 100000);
-          ctx.fillStyle = "rgba(255,255,255," + (bloom * life[i]).toFixed(3) + ")";
+        // Hot particle bloom — soft halo around very hot matter
+        if (temp[i] > 12000) {
+          const intensity = Math.min(0.25, (temp[i] - 12000) / 200000);
+          const bloomR = radius * (2 + (temp[i] / 50000));
+          const grd = ctx.createRadialGradient(px[i], py[i], 0, px[i], py[i], bloomR);
+          grd.addColorStop(0, "rgba(" + (r|0) + "," + (g|0) + "," + (b|0) + "," + (intensity * life[i]).toFixed(3) + ")");
+          grd.addColorStop(0.5, "rgba(" + (r|0) + "," + (g|0) + "," + (b|0) + "," + (intensity * 0.3 * life[i]).toFixed(4) + ")");
+          grd.addColorStop(1, "rgba(" + (r|0) + "," + (g|0) + "," + (b|0) + ",0)");
+          ctx.fillStyle = grd;
           ctx.beginPath();
-          ctx.arc(px[i], py[i], radius * 2.5, 0, Math.PI * 2);
+          ctx.arc(px[i], py[i], bloomR, 0, Math.PI * 2);
           ctx.fill();
         }
       }
 
-      // Core glow
-      if (phase >= 2 && phase <= 5) {
-        const glowAlpha = phase === 5 ? 0.7 : 0.25 + (coreTemp / 80000) * 0.3;
+      // Core glow — multi-layered for depth
+      if (phase >= 1 && phase <= 5) {
         const [cr, cg, cb] = tempToRGB(Math.min(40000, coreTemp));
-        const grd = ctx.createRadialGradient(gravCenter.x, gravCenter.y, 0, gravCenter.x, gravCenter.y, coreR * 1.5);
-        grd.addColorStop(0, "rgba(" + (cr|0) + "," + (cg|0) + "," + (cb|0) + "," + glowAlpha.toFixed(2) + ")");
-        grd.addColorStop(0.4, "rgba(" + (cr|0) + "," + (cg|0) + "," + (cb|0) + "," + (glowAlpha * 0.3).toFixed(3) + ")");
-        grd.addColorStop(1, "rgba(" + (cr|0) + "," + (cg|0) + "," + (cb|0) + ",0)");
+        const layers = [
+          { rMul: 3.0, alpha: 0.04 },
+          { rMul: 2.0, alpha: 0.1 },
+          { rMul: 1.2, alpha: 0.2 },
+          { rMul: 0.6, alpha: 0.4 },
+          { rMul: 0.2, alpha: 0.7 },
+        ];
+        for (const l of layers) {
+          const lr = coreR * l.rMul;
+          const grd = ctx.createRadialGradient(gravCenter.x, gravCenter.y, 0, gravCenter.x, gravCenter.y, lr);
+          grd.addColorStop(0, "rgba(" + (cr|0) + "," + (cg|0) + "," + (cb|0) + "," + (l.alpha * 0.8).toFixed(3) + ")");
+          grd.addColorStop(0.6, "rgba(" + (cr|0) + "," + (cg|0) + "," + (cb|0) + "," + (l.alpha * 0.15).toFixed(4) + ")");
+          grd.addColorStop(1, "rgba(" + (cr|0) + "," + (cg|0) + "," + (cb|0) + ",0)");
+          ctx.fillStyle = grd;
+          ctx.beginPath();
+          ctx.arc(gravCenter.x, gravCenter.y, lr, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      // Shockwave — volumetric: thick heated shell with sharp leading edge
+      if (shockwave.active) {
+        const progress = shockwave.r / shockwave.maxR;
+        const intensity = Math.pow(1 - progress, 1.5);
+        const thickness = 30 + (1 - progress) * 60;
+
+        // Heated gas behind the front (volumetric fill)
+        const innerR = Math.max(0, shockwave.r - thickness);
+        const grd = ctx.createRadialGradient(shockwave.x, shockwave.y, innerR, shockwave.x, shockwave.y, shockwave.r);
+        grd.addColorStop(0, "rgba(80,120,200,0)");
+        grd.addColorStop(0.6, "rgba(120,160,255," + (intensity * 0.06).toFixed(4) + ")");
+        grd.addColorStop(0.85, "rgba(180,210,255," + (intensity * 0.15).toFixed(3) + ")");
+        grd.addColorStop(0.97, "rgba(220,240,255," + (intensity * 0.5).toFixed(3) + ")");
+        grd.addColorStop(1, "rgba(255,255,255," + (intensity * 0.7).toFixed(3) + ")");
         ctx.fillStyle = grd;
         ctx.beginPath();
-        ctx.arc(gravCenter.x, gravCenter.y, coreR * 1.5, 0, Math.PI * 2);
-        ctx.fill();
-      }
-
-      // Shockwave ring
-      if (shockwave.active) {
-        const shockAlpha = Math.max(0, 0.6 * (1 - shockwave.r / shockwave.maxR));
-        ctx.strokeStyle = "rgba(180,200,255," + shockAlpha.toFixed(3) + ")";
-        ctx.lineWidth = 3 + (1 - shockwave.r / shockwave.maxR) * 8;
-        ctx.beginPath();
         ctx.arc(shockwave.x, shockwave.y, shockwave.r, 0, Math.PI * 2);
-        ctx.stroke();
-        // Inner hot shell
-        ctx.strokeStyle = "rgba(255,255,255," + (shockAlpha * 0.5).toFixed(3) + ")";
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.arc(shockwave.x, shockwave.y, shockwave.r * 0.95, 0, Math.PI * 2);
-        ctx.stroke();
-      }
-
-      // Neutron star (phases 6-7): tiny intense pulsing point
-      if (neutronStar && phase >= 6) {
-        neutronStar.pulsePhase += dt * 20;
-        const pAlpha = 0.6 + 0.4 * Math.sin(neutronStar.pulsePhase);
-        const beamLen = 80 + 40 * Math.sin(neutronStar.pulsePhase * 0.3);
-        ctx.fillStyle = "rgba(200,220,255," + pAlpha.toFixed(2) + ")";
-        ctx.beginPath();
-        ctx.arc(neutronStar.x, neutronStar.y, neutronStar.r, 0, Math.PI * 2);
         ctx.fill();
-        // Pulsar beams
-        const beamAng = neutronStar.pulsePhase * 0.7;
-        ctx.strokeStyle = "rgba(150,180,255," + (pAlpha * 0.35).toFixed(3) + ")";
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.moveTo(neutronStar.x, neutronStar.y);
-        ctx.lineTo(neutronStar.x + Math.cos(beamAng) * beamLen, neutronStar.y + Math.sin(beamAng) * beamLen);
-        ctx.moveTo(neutronStar.x, neutronStar.y);
-        ctx.lineTo(neutronStar.x - Math.cos(beamAng) * beamLen, neutronStar.y - Math.sin(beamAng) * beamLen);
-        ctx.stroke();
       }
 
-      // Detonation flash
-      if (phase === 6 && phaseT < 300) {
-        const flashAlpha = (1 - phaseT / 300) * 0.8;
-        ctx.globalCompositeOperation = "source-over";
-        ctx.fillStyle = "rgba(255,255,255," + flashAlpha.toFixed(2) + ")";
-        ctx.fillRect(0, 0, w, h);
+      // Neutron star (phases 6-7): compact remnant with synchrotron radiation
+      if (neutronStar && phase >= 6) {
+        neutronStar.pulsePhase += dt * 12;
+        const pFreq = Math.sin(neutronStar.pulsePhase);
+        const beamAng = neutronStar.pulsePhase * 0.5;
+
+        // Magnetosphere glow
+        const magR = 15 + 5 * pFreq;
+        const mgrd = ctx.createRadialGradient(cx, cy, 0, cx, cy, magR);
+        mgrd.addColorStop(0, "rgba(200,220,255,0.8)");
+        mgrd.addColorStop(0.3, "rgba(150,180,255,0.3)");
+        mgrd.addColorStop(1, "rgba(100,140,255,0)");
+        ctx.fillStyle = mgrd;
+        ctx.beginPath();
+        ctx.arc(cx, cy, magR, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Synchrotron beams — cone-shaped, not lines
+        const beamLen = 120 + 50 * pFreq;
+        const beamWidth = 0.08;
+        for (let side = 0; side < 2; side++) {
+          const ba = beamAng + side * Math.PI;
+          const endX = cx + Math.cos(ba) * beamLen;
+          const endY = cy + Math.sin(ba) * beamLen;
+          const perpX = -Math.sin(ba);
+          const perpY = Math.cos(ba);
+          const spread = beamLen * beamWidth;
+
+          const bgrd = ctx.createLinearGradient(cx, cy, endX, endY);
+          bgrd.addColorStop(0, "rgba(180,200,255,0.6)");
+          bgrd.addColorStop(0.3, "rgba(140,170,255,0.2)");
+          bgrd.addColorStop(1, "rgba(100,140,255,0)");
+          ctx.fillStyle = bgrd;
+          ctx.beginPath();
+          ctx.moveTo(cx, cy);
+          ctx.lineTo(endX + perpX * spread, endY + perpY * spread);
+          ctx.lineTo(endX - perpX * spread, endY - perpY * spread);
+          ctx.closePath();
+          ctx.fill();
+        }
+      }
+
+      // Detonation bloom — physically motivated: bright core expands outward
+      // with inverse-square falloff, no flat fill
+      if (phase === 6 && phaseT < 600) {
+        ctx.globalCompositeOperation = "lighter";
+        const flashProg = phaseT / 600;
+        const peakAt = 0.15;
+        const envelope = flashProg < peakAt
+          ? Math.pow(flashProg / peakAt, 0.5)
+          : Math.pow(1 - (flashProg - peakAt) / (1 - peakAt), 2.5);
+        const bloomRadius = 40 + flashProg * Math.min(w, h) * 0.4;
+
+        // Multiple spectral layers: core white → blue halo → UV fringe
+        const layers = [
+          { r: bloomRadius * 0.15, color: [255, 255, 255], a: envelope * 0.9 },
+          { r: bloomRadius * 0.35, color: [220, 235, 255], a: envelope * 0.4 },
+          { r: bloomRadius * 0.65, color: [160, 190, 255], a: envelope * 0.15 },
+          { r: bloomRadius,        color: [100, 130, 220], a: envelope * 0.04 },
+        ];
+        for (const l of layers) {
+          const grd = ctx.createRadialGradient(cx, cy, 0, cx, cy, l.r);
+          grd.addColorStop(0, "rgba(" + l.color[0] + "," + l.color[1] + "," + l.color[2] + "," + l.a.toFixed(3) + ")");
+          grd.addColorStop(0.5, "rgba(" + l.color[0] + "," + l.color[1] + "," + l.color[2] + "," + (l.a * 0.3).toFixed(4) + ")");
+          grd.addColorStop(1, "rgba(" + l.color[0] + "," + l.color[1] + "," + l.color[2] + ",0)");
+          ctx.fillStyle = grd;
+          ctx.beginPath();
+          ctx.arc(cx, cy, l.r, 0, Math.PI * 2);
+          ctx.fill();
+        }
       }
 
       widgetRAF = requestAnimationFrame(step);
