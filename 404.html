@@ -577,7 +577,7 @@
 
       const m = matchSlug();
       if (m) { clearBuf(); go("/" + m); return; }
-      if (WIDGETS.includes(buf)) { clearBuf(); fireWidget(buf); return; }
+      if (WIDGETS.includes(buf)) { const w = buf; clearBuf(); fireWidget(w); return; }
       if (buf === "eric") {
         clearBuf();
         window.open("https://www.linkedin.com/in/eric-li-226850249/", "_blank");
