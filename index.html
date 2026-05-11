@@ -204,7 +204,7 @@
     position: absolute;
     bottom: 0; left: 0; right: 0;
     padding: 24px 10px 8px;
-    background: linear-gradient(transparent, rgba(0,0,0,0.75));
+    background: linear-gradient(transparent, rgba(0,0,0,0.7));
     color: rgba(232,230,223,0.85);
     font-family: 'Iowan Old Style', Georgia, serif;
     font-size: 11px;
@@ -1217,15 +1217,20 @@
       }
 
       // Advection
-      vec2 prevUV = v_uv - vel * u_dt * 0.6;
+      vec2 prevUV = v_uv - vel * u_dt * 0.5;
       vec4 advected = texture(u_state, prevUV);
 
-      // Diffusion
+      // Heavy diffusion to eliminate hard edges
       vec4 L = texture(u_state, v_uv + vec2(-px.x, 0));
       vec4 R = texture(u_state, v_uv + vec2( px.x, 0));
       vec4 U = texture(u_state, v_uv + vec2(0,  px.y));
       vec4 D = texture(u_state, v_uv + vec2(0, -px.y));
-      vec4 diffused = mix(advected, (L + R + U + D) * 0.25, 0.15);
+      vec4 TL = texture(u_state, v_uv + vec2(-px.x, px.y));
+      vec4 TR = texture(u_state, v_uv + vec2( px.x, px.y));
+      vec4 BL = texture(u_state, v_uv + vec2(-px.x, -px.y));
+      vec4 BR = texture(u_state, v_uv + vec2( px.x, -px.y));
+      vec4 neighbors = (L + R + U + D) * 0.125 + (TL + TR + BL + BR) * 0.0625;
+      vec4 diffused = mix(advected, neighbors * (1.0/0.75), 0.35);
 
       vel = diffused.xy;
       density = diffused.z;
@@ -1234,25 +1239,20 @@
       // Pressure correction
       float divR2 = R.x - L.x;
       float divU2 = U.y - D.y;
-      vel -= vec2(divR2, divU2) * 0.2;
+      vel -= vec2(divR2, divU2) * 0.15;
 
-      // Multi-scale curl noise — large and small swirl structures
-      float nR = fbm(vec3((v_uv + vec2(px.x,0)) * 5.0, u_time * 0.2));
-      float nL = fbm(vec3((v_uv - vec2(px.x,0)) * 5.0, u_time * 0.2));
-      float nU = fbm(vec3((v_uv + vec2(0,px.y)) * 5.0, u_time * 0.2));
-      float nD = fbm(vec3((v_uv - vec2(0,px.y)) * 5.0, u_time * 0.2));
-      vec2 curl = vec2(nU - nD, -(nR - nL)) * 0.07;
+      // Smooth curl noise — gentle swirling, no hard shear
+      float nR = fbm(vec3((v_uv + vec2(px.x*2.0,0)) * 3.0, u_time * 0.15));
+      float nL = fbm(vec3((v_uv - vec2(px.x*2.0,0)) * 3.0, u_time * 0.15));
+      float nU = fbm(vec3((v_uv + vec2(0,px.y*2.0)) * 3.0, u_time * 0.15));
+      float nD2 = fbm(vec3((v_uv - vec2(0,px.y*2.0)) * 3.0, u_time * 0.15));
+      vec2 curl = vec2(nU - nD2, -(nR - nL)) * 0.04;
       vel += curl;
 
-      // Fine-scale turbulence for filamentary structure
-      float f1 = fbm(vec3(v_uv * 12.0, u_time * 0.6)) - 0.5;
-      float f2 = fbm(vec3(v_uv.yx * 12.0, u_time * 0.6 + 3.0)) - 0.5;
-      vel += vec2(f1, f2) * 0.02;
-
-      // Large-scale flow field — slow drift
-      float s1 = fbm(vec3(v_uv * 2.0, u_time * 0.08)) - 0.5;
-      float s2 = fbm(vec3(v_uv.yx * 2.0, u_time * 0.08 + 10.0)) - 0.5;
-      vel += vec2(s1, s2) * 0.03;
+      // Large-scale slow drift
+      float s1 = fbm(vec3(v_uv * 1.5, u_time * 0.06)) - 0.5;
+      float s2 = fbm(vec3(v_uv.yx * 1.5, u_time * 0.06 + 10.0)) - 0.5;
+      vel += vec2(s1, s2) * 0.015;
 
       // Central energy source — just enough to keep it alive, not blinding
       float cDist = length(v_uv - vec2(0.5));
@@ -1477,8 +1477,8 @@
         const n3 = Math.sin(u*43.7 - v*37.3 + 3.1) * Math.cos(u*53.1 + v*41.7);
         const density = (0.2 + 0.5 * Math.abs(n1 + n2 * 0.5 + n3 * 0.25)) * falloff;
         const temperature = density * 0.15 * falloff;
-        initData[idx] = (n2 * 0.3) * falloff;     // vel.x
-        initData[idx+1] = (n3 * 0.3) * falloff;   // vel.y
+        initData[idx] = (n2 * 0.1) * falloff;     // vel.x
+        initData[idx+1] = (n3 * 0.1) * falloff;   // vel.y
         initData[idx+2] = density;                  // density
         initData[idx+3] = temperature;              // temperature
       }
