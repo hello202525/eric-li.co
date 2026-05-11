@@ -1480,46 +1480,16 @@
         ctx.fill();
       }
 
-      // Neutron star (phases 6-7): compact remnant with synchrotron radiation
-      if (neutronStar && phase >= 6) {
-        neutronStar.pulsePhase += dt * 12;
-        const pFreq = Math.sin(neutronStar.pulsePhase);
-        const beamAng = neutronStar.pulsePhase * 0.5;
-
-        // Magnetosphere glow
-        const magR = 15 + 5 * pFreq;
-        const mgrd = ctx.createRadialGradient(cx, cy, 0, cx, cy, magR);
-        mgrd.addColorStop(0, "rgba(200,220,255,0.8)");
-        mgrd.addColorStop(0.3, "rgba(150,180,255,0.3)");
-        mgrd.addColorStop(1, "rgba(100,140,255,0)");
-        ctx.fillStyle = mgrd;
+      // Compact remnant — just a faint steady point, no spinning gimmicks
+      if (neutronStar && phase >= 7) {
+        const remnantAlpha = Math.min(0.6, phaseProgress * 0.6);
+        const grd = ctx.createRadialGradient(cx, cy, 0, cx, cy, 6);
+        grd.addColorStop(0, "rgba(200,215,255," + remnantAlpha.toFixed(2) + ")");
+        grd.addColorStop(1, "rgba(200,215,255,0)");
+        ctx.fillStyle = grd;
         ctx.beginPath();
-        ctx.arc(cx, cy, magR, 0, Math.PI * 2);
+        ctx.arc(cx, cy, 6, 0, Math.PI * 2);
         ctx.fill();
-
-        // Synchrotron beams — cone-shaped, not lines
-        const beamLen = 120 + 50 * pFreq;
-        const beamWidth = 0.08;
-        for (let side = 0; side < 2; side++) {
-          const ba = beamAng + side * Math.PI;
-          const endX = cx + Math.cos(ba) * beamLen;
-          const endY = cy + Math.sin(ba) * beamLen;
-          const perpX = -Math.sin(ba);
-          const perpY = Math.cos(ba);
-          const spread = beamLen * beamWidth;
-
-          const bgrd = ctx.createLinearGradient(cx, cy, endX, endY);
-          bgrd.addColorStop(0, "rgba(180,200,255,0.6)");
-          bgrd.addColorStop(0.3, "rgba(140,170,255,0.2)");
-          bgrd.addColorStop(1, "rgba(100,140,255,0)");
-          ctx.fillStyle = bgrd;
-          ctx.beginPath();
-          ctx.moveTo(cx, cy);
-          ctx.lineTo(endX + perpX * spread, endY + perpY * spread);
-          ctx.lineTo(endX - perpX * spread, endY - perpY * spread);
-          ctx.closePath();
-          ctx.fill();
-        }
       }
 
       // Detonation bloom — physically motivated: bright core expands outward
