@@ -947,6 +947,7 @@
     $widgetCanvas.classList.remove("show");
     document.body.classList.remove("stars-mode", "void-mode", "supernova-mode", "mirror-mode", "pulse-mode");
     $widget.innerHTML = "";
+    if (supernovaCleanup) { supernovaCleanup(); supernovaCleanup = null; }
     if (mirrorStream) {
       mirrorStream.getTracks().forEach(t => t.stop());
       mirrorStream = null;
@@ -1126,225 +1127,145 @@
   }
 
   // --- supernova ---
+  let supernovaCleanup = null;
   function runSupernova() {
     const ctx = sizeWidgetCanvas();
     const w = innerWidth, h = innerHeight;
-    const cx = w / 2, cy = h / 2;
     document.body.classList.add("supernova-mode");
     $widgetCanvas.classList.add("show");
+    $widgetCanvas.style.pointerEvents = "auto";
 
-    const N = 1800;
+    let mx = w / 2, my = h / 2;
+    let mouseDown = false;
+    const onMM = (e) => { mx = e.clientX; my = e.clientY; };
+    const onMD = () => { mouseDown = true; };
+    const onMU = () => { mouseDown = false; };
+    window.addEventListener("mousemove", onMM);
+    window.addEventListener("mousedown", onMD);
+    window.addEventListener("mouseup", onMU);
+    supernovaCleanup = () => {
+      window.removeEventListener("mousemove", onMM);
+      window.removeEventListener("mousedown", onMD);
+      window.removeEventListener("mouseup", onMU);
+      $widgetCanvas.style.pointerEvents = "";
+    };
+
+    const N = 2400;
     const particles = [];
     for (let i = 0; i < N; i++) {
       const ang = Math.random() * Math.PI * 2;
-      const dist = 80 + Math.random() * 260;
+      const dist = 50 + Math.random() * Math.min(w, h) * 0.4;
+      const speed = 10 + Math.random() * 40;
       particles.push({
-        x: cx + Math.cos(ang) * dist,
-        y: cy + Math.sin(ang) * dist,
-        vx: (Math.random() - 0.5) * 20,
-        vy: (Math.random() - 0.5) * 20,
-        r: 0.8 + Math.random() * 1.8,
-        hue: 220 + Math.random() * 60,
-        alpha: 0.3 + Math.random() * 0.5,
+        x: w / 2 + Math.cos(ang) * dist,
+        y: h / 2 + Math.sin(ang) * dist,
+        vx: Math.cos(ang + Math.PI / 2) * speed,
+        vy: Math.sin(ang + Math.PI / 2) * speed,
+        mass: 0.5 + Math.random() * 2,
+        temp: Math.random(),
       });
     }
 
-    const start = performance.now();
-    let lastT = start;
+    let lastT = performance.now();
+    let energy = 0;
 
     function step(now) {
-      const dt = Math.min(0.05, (now - lastT) / 1000);
+      if (activeWidget !== "supernova") return;
+      const dt = Math.min(0.033, (now - lastT) / 1000);
       lastT = now;
-      const t = (now - start) / 1000;
-      const totalDur = 16;
 
       ctx.globalCompositeOperation = "source-over";
-      ctx.fillStyle = "rgba(2,1,8,0.25)";
+      ctx.fillStyle = "rgba(2,1,8,0.12)";
       ctx.fillRect(0, 0, w, h);
       ctx.globalCompositeOperation = "lighter";
 
-      if (t < 2) {
-        // Phase 1: Nebula — gentle inward drift
-        for (const p of particles) {
-          const dx = cx - p.x, dy = cy - p.y;
-          const dist = Math.hypot(dx, dy) || 1;
-          p.vx += (dx / dist) * 8 * dt;
-          p.vy += (dy / dist) * 8 * dt;
-          p.vx += (Math.random() - 0.5) * 30 * dt;
-          p.vy += (Math.random() - 0.5) * 30 * dt;
-          p.vx *= 0.98;
-          p.vy *= 0.98;
-          p.x += p.vx * dt;
-          p.y += p.vy * dt;
-          ctx.fillStyle = "hsla(" + p.hue + ",60%,60%," + (p.alpha * 0.6) + ")";
-          ctx.beginPath();
-          ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-          ctx.fill();
-        }
-      } else if (t < 4) {
-        // Phase 2: Collapse — accelerate inward
-        const prog = (t - 2) / 2;
-        for (const p of particles) {
-          const dx = cx - p.x, dy = cy - p.y;
-          const dist = Math.hypot(dx, dy) || 1;
-          const force = 60 + prog * 200;
+      const gravStr = mouseDown ? 800 : 280;
+      const repel = mouseDown ? 0 : 0;
+      energy *= 0.995;
+
+      for (const p of particles) {
+        const dx = mx - p.x, dy = my - p.y;
+        const distSq = dx * dx + dy * dy + 400;
+        const dist = Math.sqrt(distSq);
+        const minDist = mouseDown ? 8 : 40;
+
+        if (dist > minDist) {
+          const force = gravStr * p.mass / distSq;
           p.vx += (dx / dist) * force * dt;
           p.vy += (dy / dist) * force * dt;
-          p.vx *= 0.95;
-          p.vy *= 0.95;
-          p.x += p.vx * dt;
-          p.y += p.vy * dt;
-          p.hue = 220 + prog * 40;
-          ctx.fillStyle = "hsla(" + p.hue + ",70%,65%," + (p.alpha * (0.6 + prog * 0.3)) + ")";
-          ctx.beginPath();
-          ctx.arc(p.x, p.y, p.r * (1 - prog * 0.4), 0, Math.PI * 2);
-          ctx.fill();
+        } else if (!mouseDown) {
+          const repF = 2000 / distSq;
+          p.vx -= (dx / dist) * repF * dt;
+          p.vy -= (dy / dist) * repF * dt;
         }
-      } else if (t < 4.5) {
-        // Phase 3: Ignition — white flash
-        const prog = (t - 4) / 0.5;
-        const flash = prog < 0.5 ? prog * 2 : 2 - prog * 2;
-        ctx.globalCompositeOperation = "source-over";
-        ctx.fillStyle = "rgba(2,1,8," + (1 - flash * 0.7) + ")";
-        ctx.fillRect(0, 0, w, h);
-        ctx.globalCompositeOperation = "lighter";
-        ctx.fillStyle = "rgba(255,255,240," + (flash * 0.9) + ")";
-        ctx.beginPath();
-        ctx.arc(cx, cy, 20 + flash * 60, 0, Math.PI * 2);
-        ctx.fill();
-        for (const p of particles) {
-          p.x += (cx - p.x) * 0.15;
-          p.y += (cy - p.y) * 0.15;
-          ctx.fillStyle = "rgba(255,250,230," + (p.alpha * flash) + ")";
-          ctx.beginPath();
-          ctx.arc(p.x, p.y, p.r * 0.5, 0, Math.PI * 2);
-          ctx.fill();
+
+        const speed = Math.hypot(p.vx, p.vy);
+        const maxSpeed = 900;
+        if (speed > maxSpeed) {
+          p.vx = (p.vx / speed) * maxSpeed;
+          p.vy = (p.vy / speed) * maxSpeed;
         }
-      } else if (t < 8) {
-        // Phase 4: Fusion — golden pulsing star
-        const prog = (t - 4.5) / 3.5;
-        const pulse = 1 + 0.15 * Math.sin(t * 8);
-        const starR = (30 + prog * 40) * pulse;
-        ctx.fillStyle = "rgba(255,220,100,0.4)";
+
+        p.vx *= 0.998;
+        p.vy *= 0.998;
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+
+        if (p.x < -50) p.x += w + 100;
+        if (p.x > w + 50) p.x -= w + 100;
+        if (p.y < -50) p.y += h + 100;
+        if (p.y > h + 50) p.y -= h + 100;
+
+        p.temp = Math.min(1, speed / 400);
+        energy += speed * dt * 0.001;
+      }
+
+      const clampedEnergy = Math.min(1, energy / 800);
+
+      for (const p of particles) {
+        const t = p.temp;
+        const r = t < 0.25 ? 60 + t * 600
+                : t < 0.5 ? 210 + (t - 0.25) * 180
+                : t < 0.75 ? 255
+                : 200 + (1 - t) * 220;
+        const g = t < 0.25 ? 20 + t * 200
+                : t < 0.5 ? 70 + (t - 0.25) * 600
+                : t < 0.75 ? 220 + (t - 0.5) * 140
+                : 240 + (1 - t) * 60;
+        const b = t < 0.25 ? 80 + t * 700
+                : t < 0.5 ? 255
+                : t < 0.75 ? 255 - (t - 0.5) * 400
+                : 155 - (1 - t) * 400;
+
+        const alpha = 0.15 + p.temp * 0.6 + clampedEnergy * 0.2;
+        const radius = 0.4 + p.mass * 0.6 + p.temp * 1.5;
+
+        ctx.fillStyle = "rgba(" + Math.round(r) + "," + Math.round(g) + "," + Math.round(Math.max(0, b)) + "," + Math.min(0.9, alpha) + ")";
         ctx.beginPath();
-        ctx.arc(cx, cy, starR * 1.8, 0, Math.PI * 2);
+        ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
         ctx.fill();
-        ctx.fillStyle = "rgba(255,240,180,0.7)";
-        ctx.beginPath();
-        ctx.arc(cx, cy, starR, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = "rgba(255,255,240,0.9)";
-        ctx.beginPath();
-        ctx.arc(cx, cy, starR * 0.4, 0, Math.PI * 2);
-        ctx.fill();
-        for (const p of particles) {
-          const ang = Math.atan2(p.y - cy, p.x - cx) + dt * (0.5 + prog);
-          const orbitR = 50 + Math.random() * 80 * (1 + prog);
-          p.x += (cx + Math.cos(ang) * orbitR - p.x) * 0.02;
-          p.y += (cy + Math.sin(ang) * orbitR - p.y) * 0.02;
-          p.hue = 30 + Math.random() * 30;
-          ctx.fillStyle = "hsla(" + p.hue + ",90%,70%," + (p.alpha * 0.5) + ")";
+
+        if (p.temp > 0.6) {
+          ctx.fillStyle = "rgba(255,255,255," + ((p.temp - 0.6) * 0.4) + ")";
           ctx.beginPath();
-          ctx.arc(p.x, p.y, p.r * 0.7, 0, Math.PI * 2);
-          ctx.fill();
-        }
-      } else if (t < 10) {
-        // Phase 5: Red giant — expand, shift orange/red
-        const prog = (t - 8) / 2;
-        const starR = 70 + prog * (Math.min(w, h) * 0.3);
-        const pulse = 1 + 0.05 * Math.sin(t * 3);
-        ctx.fillStyle = "rgba(180,60,20,0.25)";
-        ctx.beginPath();
-        ctx.arc(cx, cy, starR * 1.4 * pulse, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = "rgba(220,100,30,0.4)";
-        ctx.beginPath();
-        ctx.arc(cx, cy, starR * pulse, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = "rgba(255,180,80,0.5)";
-        ctx.beginPath();
-        ctx.arc(cx, cy, starR * 0.5 * pulse, 0, Math.PI * 2);
-        ctx.fill();
-        for (const p of particles) {
-          const ang = Math.atan2(p.y - cy, p.x - cx);
-          const dist = Math.hypot(p.x - cx, p.y - cy);
-          const targetDist = starR * (0.3 + Math.random() * 0.8);
-          p.x += (cx + Math.cos(ang) * targetDist - p.x) * 0.01;
-          p.y += (cy + Math.sin(ang) * targetDist - p.y) * 0.01;
-          p.vx = (Math.random() - 0.5) * 5;
-          p.vy = (Math.random() - 0.5) * 5;
-          p.x += p.vx * dt;
-          p.y += p.vy * dt;
-          ctx.fillStyle = "hsla(" + (10 + Math.random() * 30) + ",80%,55%," + (p.alpha * 0.3) + ")";
-          ctx.beginPath();
-          ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-          ctx.fill();
-        }
-      } else if (t < 12) {
-        // Phase 6: Supernova explosion
-        const prog = (t - 10) / 2;
-        if (prog < 0.1) {
-          ctx.globalCompositeOperation = "source-over";
-          ctx.fillStyle = "rgba(255,255,255," + ((0.1 - prog) * 8) + ")";
-          ctx.fillRect(0, 0, w, h);
-          ctx.globalCompositeOperation = "lighter";
-        }
-        for (const p of particles) {
-          if (prog < 0.15 && p.vx < 100) {
-            const ang = Math.atan2(p.y - cy, p.x - cx) + (Math.random() - 0.5) * 0.5;
-            const speed = 200 + Math.random() * 600;
-            p.vx = Math.cos(ang) * speed;
-            p.vy = Math.sin(ang) * speed;
-            p.hue = 200 + Math.random() * 80;
-          }
-          p.vx *= 0.99;
-          p.vy *= 0.99;
-          p.x += p.vx * dt;
-          p.y += p.vy * dt;
-          const a = p.alpha * (1 - prog * 0.5);
-          ctx.fillStyle = "hsla(" + p.hue + ",70%,70%," + a + ")";
-          ctx.beginPath();
-          ctx.arc(p.x, p.y, p.r * (1 + prog), 0, Math.PI * 2);
-          ctx.fill();
-        }
-      } else if (t < totalDur) {
-        // Phase 7: Remnant nebula — ring + twinkle
-        const prog = (t - 12) / 4;
-        const fadeOut = prog > 0.7 ? 1 - (prog - 0.7) / 0.3 : 1;
-        for (const p of particles) {
-          p.vx *= 0.96;
-          p.vy *= 0.96;
-          p.x += p.vx * dt;
-          p.y += p.vy * dt;
-          const dist = Math.hypot(p.x - cx, p.y - cy);
-          const ringTarget = 120 + Math.random() * 100;
-          if (dist > 10) {
-            const ang = Math.atan2(p.y - cy, p.x - cx);
-            p.x += (cx + Math.cos(ang) * ringTarget - p.x) * 0.005;
-            p.y += (cy + Math.sin(ang) * ringTarget - p.y) * 0.005;
-          }
-          const twinkle = 0.5 + 0.5 * Math.sin(t * 3 + p.hue);
-          ctx.fillStyle = "hsla(" + p.hue + ",50%,65%," + (p.alpha * 0.4 * twinkle * fadeOut) + ")";
-          ctx.beginPath();
-          ctx.arc(p.x, p.y, p.r * 0.8, 0, Math.PI * 2);
-          ctx.fill();
-        }
-        for (let i = 0; i < 12; i++) {
-          const sx = cx + (Math.random() - 0.5) * 160;
-          const sy = cy + (Math.random() - 0.5) * 160;
-          const tw = 0.4 + 0.6 * Math.sin(t * 5 + i * 7);
-          ctx.fillStyle = "rgba(255,255,240," + (tw * 0.6 * fadeOut) + ")";
-          ctx.beginPath();
-          ctx.arc(sx, sy, 0.5 + Math.random(), 0, Math.PI * 2);
+          ctx.arc(p.x, p.y, radius * 0.4, 0, Math.PI * 2);
           ctx.fill();
         }
       }
 
-      if (t < totalDur) {
-        widgetRAF = requestAnimationFrame(step);
-      } else {
-        clearWidget();
+      if (mouseDown) {
+        const glowR = 20 + clampedEnergy * 60;
+        const grd = ctx.createRadialGradient(mx, my, 0, mx, my, glowR);
+        grd.addColorStop(0, "rgba(255,240,220,0.3)");
+        grd.addColorStop(0.5, "rgba(255,180,100,0.08)");
+        grd.addColorStop(1, "rgba(255,100,50,0)");
+        ctx.fillStyle = grd;
+        ctx.beginPath();
+        ctx.arc(mx, my, glowR, 0, Math.PI * 2);
+        ctx.fill();
       }
+
+      widgetRAF = requestAnimationFrame(step);
     }
     widgetRAF = requestAnimationFrame(step);
   }
@@ -1459,6 +1380,7 @@
     const w = innerWidth, h = innerHeight;
 
     pulseAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (pulseAudioCtx.state === "suspended") pulseAudioCtx.resume();
     pulseBPM = 60;
     pulseFlat = false;
     pulseStillStart = performance.now();
