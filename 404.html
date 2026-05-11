@@ -6,15 +6,6 @@
 <title>Eric Li</title>
 <meta name="color-scheme" content="light" />
 
-
-<!--
-  eric-li.co
-
-  the surface is quiet. that is by design.
-
-  try typing.
--->
-
 <style>
   :root {
     --paper:  #f7f4ec;
@@ -24,12 +15,9 @@
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-  /* selection: keep bio text selectable, in a tasteful warm grey — never browser-blue */
   ::selection      { background: rgba(0, 0, 0, 0.12); color: inherit; }
   ::-moz-selection { background: rgba(0, 0, 0, 0.12); color: inherit; }
 
-  /* images / canvases / the floating nav: never selectable, never draggable.
-     this kills the blue highlight that appears when you double-click an image. */
   img, canvas, .typer, .widget {
     user-select: none;
     -webkit-user-select: none;
@@ -52,9 +40,6 @@
     transition: background 800ms ease;
   }
 
-  /* ============================================================
-     /  — the bio. each sentence is its own paragraph, its own line.
-     ============================================================ */
   .home {
     padding: clamp(48px, 9vh, 120px) clamp(24px, 4vw, 60px);
     width: fit-content;
@@ -70,12 +55,8 @@
     letter-spacing: 0.005em;
     font-weight: 400;
   }
-  .bio p {
-    margin: 0 0 0.25em 0;
-  }
+  .bio p { margin: 0 0 0.25em 0; }
   .bio p:last-child { margin-bottom: 0; }
-  .bio .nb { white-space: nowrap; }
-
 
   .bio .end {
     cursor: pointer;
@@ -88,7 +69,6 @@
     transition: transform 600ms cubic-bezier(0.25, 0.8, 0.25, 1);
   }
 
-  /* enchanted state — hovering "beautiful things" */
   body.enchanted { transition: background 600ms ease; }
   .bio.enchanted {
     color: rgba(17,17,17,0.18);
@@ -115,9 +95,6 @@
     transform: scale(1);
   }
 
-  /* ============================================================
-     subpages — fullscreen artworks
-     ============================================================ */
   .work {
     position: fixed; inset: 0;
     background: var(--paper);
@@ -130,10 +107,7 @@
     transition: opacity 500ms ease;
     z-index: 10;
   }
-  .work.show {
-    opacity: 1;
-    pointer-events: auto;
-  }
+  .work.show { opacity: 1; pointer-events: auto; }
   .work img {
     max-width: min(58vw, 760px);
     max-height: min(62vh, 660px);
@@ -150,9 +124,6 @@
   .work.show img { opacity: 1; }
   .work .meta { display: none; }
 
-  /* ============================================================
-     /gallery — dark room, viewport-filling grid, no scroll
-     ============================================================ */
   .gallery {
     position: fixed; inset: 0;
     background: #0e0e0e;
@@ -214,9 +185,7 @@
     transition: opacity 400ms ease;
     pointer-events: none;
   }
-  .gallery-cell:hover::after {
-    opacity: 1;
-  }
+  .gallery-cell:hover::after { opacity: 1; }
   .gallery-cell img {
     display: block;
     width: 100%;
@@ -225,11 +194,6 @@
     background: #1a1a1a;
   }
 
-
-  /* ============================================================
-     ambience — the cursor leaves a faint mark, only once you've
-     unlocked something. silent on the bare home.
-     ============================================================ */
   #trail {
     position: fixed; inset: 0;
     z-index: 1;
@@ -239,11 +203,6 @@
   }
   body.unlocked #trail { opacity: 1; }
 
-  /* ============================================================
-     a transient "type a name" whisper that fades in once a key
-     is pressed, then fades when you've typed enough to be
-     navigating to something.
-     ============================================================ */
   .typer {
     position: fixed;
     left: 50%; top: 50%;
@@ -261,9 +220,6 @@
   }
   .typer.show { opacity: 1; }
 
-  /* ============================================================
-     widgets — surprises that aren't tied to art
-     ============================================================ */
   .widget {
     position: fixed; inset: 0;
     display: flex;
@@ -287,25 +243,18 @@
     transition: opacity 500ms ease;
   }
   .widget-canvas.show { opacity: 1; }
-  /* stars mode: temporarily paint the world black */
+
   body.stars-mode { background: #06070a; transition: background 400ms ease; }
   body.stars-mode .bio { color: #e8e6df; transition: color 400ms ease; }
 
-  /* void mode: total blackout */
   body.void-mode { background: #000; transition: background 1s ease; }
   body.void-mode .home { opacity: 0; transition: opacity 600ms ease; }
   body.void-mode #trail { opacity: 0; }
 
-
-  /* mirror mode */
   body.mirror-mode { background: #0a0a0a; transition: background 500ms ease; }
   body.mirror-mode .home { opacity: 0; transition: opacity 400ms ease; }
   body.mirror-mode #trail { opacity: 0; }
 
-
-  /* ============================================================
-     misc
-     ============================================================ */
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
       animation-duration: 0.01ms !important;
@@ -328,30 +277,23 @@
 
 <canvas id="trail" aria-hidden="true"></canvas>
 
-
-<!-- /  — the bare bio -->
 <main class="home" id="home" hidden>
   <section class="bio">
     <p>I enjoy <span class="end" id="end">beautiful things</span>.</p>
   </section>
 </main>
 
-<!-- /[work] subpages — one .work container that swaps content -->
 <section class="work" id="work" aria-hidden="true">
   <img id="work-img" alt="" />
   <div class="meta" id="work-meta"></div>
 </section>
 
-<!-- /gallery — contact sheet -->
 <section class="gallery" id="gallery" aria-hidden="true">
   <div class="gallery-grid" id="gallery-grid"></div>
 </section>
 
-
-<!-- the typing whisper -->
 <div class="typer" id="typer" aria-hidden="true"></div>
 
-<!-- widget overlays — moon / time / rain / stars -->
 <div class="widget" id="widget" aria-hidden="true"></div>
 <canvas class="widget-canvas" id="widget-canvas" aria-hidden="true"></canvas>
 
@@ -359,9 +301,6 @@
 (() => {
   "use strict";
 
-  // ============================================================
-  //   works — every entry below gets its own URL and shows up in the gallery
-  // ============================================================
   const WORKS = [
     { slug: "hartung",      src: "works/hartung.jpg",       meta: "Hans Hartung  ·  T1989-L50  ·  1989" },
     { slug: "sugimoto",     src: "works/sugimoto.jpg",      meta: "Hiroshi Sugimoto  ·  Caribbean Sea, Jamaica  ·  1980" },
@@ -386,33 +325,16 @@
   ];
   const SLUGS = WORKS.map(w => w.slug);
   const ARTIST_PRIMARY = {
-    hartung: "hartung",
-    sugimoto: "sugimoto",
-    tapies: "tapies",
-    stieglitz: "stieglitz",
-    atget: "atget",
-    whistler: "whistler",
-    brancusi: "brancusi",
-    spilliaert: "spilliaert",
-    goya: "goya",
-    hugo: "hugo",
-    schikaneder: "schikaneder",
-    degouve: "degouve",
-    khnopff: "khnopff",
-    carriere: "carriere",
-    ryder: "ryder",
+    hartung: "hartung", sugimoto: "sugimoto", tapies: "tapies",
+    stieglitz: "stieglitz", atget: "atget", whistler: "whistler",
+    brancusi: "brancusi", spilliaert: "spilliaert", goya: "goya",
+    hugo: "hugo", schikaneder: "schikaneder", degouve: "degouve",
+    khnopff: "khnopff", carriere: "carriere", ryder: "ryder",
     ciurlionis: "ciurlionis",
   };
 
-  // preload every image so transitions feel instant
-  for (const w of WORKS) {
-    const img = new Image();
-    img.src = w.src;
-  }
+  for (const w of WORKS) { const img = new Image(); img.src = w.src; }
 
-  // ============================================================
-  //   element references
-  // ============================================================
   const $home    = document.getElementById("home");
   const $work    = document.getElementById("work");
   const $workImg = document.getElementById("work-img");
@@ -422,10 +344,7 @@
   const $typer   = document.getElementById("typer");
   const $end     = document.getElementById("end");
 
-  // ============================================================
-  //   routing
-  // ============================================================
-  const ROUTES = new Set(["", "/", "gallery", ...SLUGS]);
+  // routing
 
   function currentPath() {
     return location.pathname.replace(/^\/+|\/+$/g, "");
@@ -444,7 +363,6 @@
     cancelAnimationFrame(showOnlyPending);
 
     if (target === "home") {
-      // fade out whichever panel is visible, then reveal home underneath
       $home.hidden = false;
       [$work, $gallery].forEach(el => {
         el.style.transition = "";
@@ -454,7 +372,6 @@
       return;
     }
 
-    // panel-to-panel: fade out others, fade in target
     $home.hidden = true;
     const el = target === "work" ? $work : target === "gallery" ? $gallery : null;
     if (!el) return;
@@ -476,7 +393,7 @@
     clearTimeout(idleTimer);
     if (idleActive) { idleActive = false; }
     if (activeWidget) clearWidget();
-    document.body.classList.add("unlocked"); // any non-home page enables ambience too
+    document.body.classList.add("unlocked");
 
     const work = WORKS.find(w => w.slug === path);
     if (work) {
@@ -493,16 +410,15 @@
       showOnly("gallery");
       return;
     }
-    // home — wipe the unlocked flag so the bare bio loads clean
+
     document.body.classList.remove("unlocked");
     document.title = "Eric Li";
     showOnly("home");
     resetIdle();
   }
 
-  // ============================================================
-  //   dark room gallery — spotlight follows cursor
-  // ============================================================
+  // gallery
+
   function buildGallery() {
     $grid.innerHTML = "";
     const shuffled = WORKS.slice();
@@ -528,18 +444,13 @@
 
   $gallery.addEventListener("click", (e) => {
     const cell = e.target.closest(".gallery-cell");
-    if (cell) {
-      go("/" + cell.dataset.slug);
-    } else {
-      go("/");
-    }
+    if (cell) { go("/" + cell.dataset.slug); } else { go("/"); }
   });
 
-  // back/forward
   window.addEventListener("popstate", () => render(currentPath()));
 
-  // a click on the artwork itself advances to the next random work;
-  // a click on the surrounding paper takes you to the gallery.
+  // work viewer: click artwork to advance, click background to gallery
+
   let switching = false;
   $workImg.addEventListener("click", (e) => {
     e.stopPropagation();
@@ -552,7 +463,6 @@
     }
     $workImg.style.opacity = "0";
     setTimeout(() => {
-
       const w = WORKS.find(w => w.slug === next);
       if (w) {
         $workImg.src = w.src;
@@ -572,9 +482,8 @@
     go("/gallery");
   });
 
-  // ============================================================
-  //   cursor parallax — artworks come alive
-  // ============================================================
+  // parallax on work viewer
+
   let parallaxX = 0, parallaxY = 0;
   let targetX = 0, targetY = 0;
   let parallaxRAF = 0;
@@ -586,61 +495,36 @@
     }
     parallaxRAF = requestAnimationFrame(applyParallax);
   }
-  function startParallax() {
-    if (!parallaxRAF) parallaxRAF = requestAnimationFrame(applyParallax);
-  }
-  function stopParallax() {
-    cancelAnimationFrame(parallaxRAF);
-    parallaxRAF = 0;
-    parallaxX = parallaxY = targetX = targetY = 0;
-    if ($workImg) $workImg.style.transform = "";
-  }
+  parallaxRAF = requestAnimationFrame(applyParallax);
   $work.addEventListener("pointermove", (e) => {
     const r = $work.getBoundingClientRect();
-    const cx = r.left + r.width / 2;
-    const cy = r.top + r.height / 2;
-    const nx = (e.clientX - cx) / r.width;   // -0.5 .. 0.5
-    const ny = (e.clientY - cy) / r.height;
-    const maxShift = 18;
-    targetX = -nx * maxShift;
-    targetY = -ny * maxShift;
+    targetX = -((e.clientX - r.left - r.width / 2) / r.width) * 18;
+    targetY = -((e.clientY - r.top - r.height / 2) / r.height) * 18;
   });
-  $work.addEventListener("pointerleave", () => {
-    targetX = targetY = 0;
-  });
+  $work.addEventListener("pointerleave", () => { targetX = targetY = 0; });
 
-  // ============================================================
-  //   long-press on home — hold the cursor down (700ms) and a
-  //   random work blooms in
-  // ============================================================
+  // long-press on home opens random work
+
   let pressTimer = 0;
   $home.addEventListener("pointerdown", (e) => {
-    // ignore presses on the clickable period (different easter egg)
     if (e.target === $end) return;
     pressTimer = setTimeout(() => {
-      const next = SLUGS[Math.floor(Math.random() * SLUGS.length)];
-      go("/" + next);
+      go("/" + SLUGS[Math.floor(Math.random() * SLUGS.length)]);
     }, 700);
   });
-  function cancelPress() {
-    if (pressTimer) { clearTimeout(pressTimer); pressTimer = 0; }
-  }
+  function cancelPress() { if (pressTimer) { clearTimeout(pressTimer); pressTimer = 0; } }
   $home.addEventListener("pointerup", cancelPress);
   $home.addEventListener("pointerleave", cancelPress);
   $home.addEventListener("pointercancel", cancelPress);
 
-  // ============================================================
-  //   easter egg 1 — type any artist's surname to navigate
-  //   show the buffer mid-screen as it grows
-  // ============================================================
+  // typed commands
+
   let buf = "";
   let bufTimer = 0;
 
   function clearBuf() {
     buf = "";
     $typer.classList.remove("show");
-    // let the fade-out finish before wiping the text, so the
-    // word visibly fades instead of just disappearing.
     setTimeout(() => {
       if (!$typer.classList.contains("show")) $typer.textContent = "";
     }, 550);
@@ -648,25 +532,12 @@
 
   const ARTIST_KEYS = Object.keys(ARTIST_PRIMARY);
   const TYPEABLE = [...new Set([...ARTIST_KEYS, "gallery"])];
-
-  // widgets — words that fire surprises that aren't tied to art
   const WIDGETS = ["stars", "void", "mirror"];
-
-  // year codes — each work's creation year sends you to that work
   const YEARS = {
-    "1820": "goya",
-    "1867": "hugo",
-    "1875": "whistler",
-    "1891": "khnopff",
-    "1892": "degouve",
-    "1898": "atget-3",
-    "1906": "schikaneder",
-    "1908": "spilliaert",
-    "1920": "brancusi",
-    "1927": "atget",
-    "1980": "sugimoto",
-    "1983": "tapies",
-    "1989": "hartung",
+    "1820": "goya", "1867": "hugo", "1875": "whistler", "1891": "khnopff",
+    "1892": "degouve", "1898": "atget-3", "1906": "schikaneder",
+    "1908": "spilliaert", "1920": "brancusi", "1927": "atget",
+    "1980": "sugimoto", "1983": "tapies", "1989": "hartung",
   };
 
   function matchSlug() {
@@ -677,14 +548,7 @@
     return null;
   }
 
-  function matchWidget() {
-    if (!buf) return null;
-    if (WIDGETS.includes(buf)) return buf;
-    return null;
-  }
-
   window.addEventListener("keydown", (e) => {
-    // ignore in form fields
     if (e.target && (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA")) return;
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     const k = e.key;
@@ -695,7 +559,6 @@
       if (currentPath() !== "") go("/");
       return;
     }
-    // immersive modes — only ESC can exit
     if (activeWidget === "stars" || activeWidget === "mirror") return;
     if (k === "Backspace") {
       if (buf.length) {
@@ -713,35 +576,20 @@
       bufTimer = setTimeout(clearBuf, 1600);
 
       const m = matchSlug();
-      if (m) {
-        clearBuf();
-        go("/" + m);
-        return;
-      }
-      const w = matchWidget();
-      if (w) {
-        clearBuf();
-        fireWidget(w);
-        return;
-      }
+      if (m) { clearBuf(); go("/" + m); return; }
+      if (WIDGETS.includes(buf)) { clearBuf(); fireWidget(buf); return; }
       if (buf === "eric") {
         clearBuf();
         window.open("https://www.linkedin.com/in/eric-li-226850249/", "_blank");
         return;
       }
-      return;
     }
   });
 
-  // ============================================================
-  //   easter egg 2 — click the final period of the bio
-  //   it takes you to a random work
-  // ============================================================
+  // "beautiful things" hover
+
   if ($end) {
-    $end.addEventListener("click", (e) => {
-      e.preventDefault();
-      go("/gallery");
-    });
+    $end.addEventListener("click", (e) => { e.preventDefault(); go("/gallery"); });
 
     const text = $end.textContent;
     const bioEl = $end.closest(".bio");
@@ -754,16 +602,8 @@
     const letters = $end.querySelectorAll("span");
 
     const enchantedTones = [
-      "#f0e6c8", // warm parchment
-      "#e8e0d0", // pale linen
-      "#dce4e0", // sage mist
-      "#e0d8e8", // faint lavender
-      "#d8e0e8", // cool steel
-      "#e8dcd0", // blush sand
-      "#d0dce0", // winter sky
-      "#e4ddd0", // raw silk
-      "#d8d8e0", // twilight gray
-      "#e0e4d8", // lichen
+      "#f0e6c8", "#e8e0d0", "#dce4e0", "#e0d8e8", "#d8e0e8",
+      "#e8dcd0", "#d0dce0", "#e4ddd0", "#d8d8e0", "#e0e4d8",
     ];
     let lastTone = -1;
     $end.addEventListener("mouseenter", () => {
@@ -790,52 +630,22 @@
     });
   }
 
-  // --- xAI hover → stars ---
-  const $xai = document.getElementById("xai");
-  if ($xai) {
-    $xai.addEventListener("mouseenter", () => {
-      if (activeWidget !== "stars") fireWidget("stars", { persist: true });
-    });
-    $xai.addEventListener("mouseleave", () => {
-      if (activeWidget === "stars") clearWidget();
-    });
-  }
+  // konami code opens gallery
 
-  // --- Harvard hover → crimson ---
-  const $hw = document.getElementById("hw");
-  if ($hw) {
-    const hwBio = $hw.closest(".bio");
-    $hw.addEventListener("mouseenter", () => {
-      document.body.classList.add("crimson-mode");
-      if (hwBio) hwBio.classList.add("crimson");
-    });
-    $hw.addEventListener("mouseleave", () => {
-      document.body.classList.remove("crimson-mode");
-      if (hwBio) hwBio.classList.remove("crimson");
-    });
-  }
-
-  // ============================================================
-  //   easter egg 3 — the konami sequence opens /gallery
-  // ============================================================
   const KONAMI = ["ArrowUp","ArrowUp","ArrowDown","ArrowDown","ArrowLeft","ArrowRight","ArrowLeft","ArrowRight","b","a"];
   let kIdx = 0;
   window.addEventListener("keydown", (e) => {
     const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
     if (k === KONAMI[kIdx]) {
       kIdx++;
-      if (kIdx === KONAMI.length) {
-        kIdx = 0;
-        go("/gallery");
-      }
+      if (kIdx === KONAMI.length) { kIdx = 0; go("/gallery"); }
     } else {
       kIdx = (k === KONAMI[0]) ? 1 : 0;
     }
   });
 
-  // ============================================================
-  //   ambience — cursor ink trail. only after first unlock.
-  // ============================================================
+  // cursor ink trail (visible after navigating away from home)
+
   const trail = document.getElementById("trail");
   let tctx, tw = 0, th = 0;
   function sizeTrail() {
@@ -864,7 +674,7 @@
     pts.push({ x: e.clientX, y: e.clientY, t: performance.now() });
   }, { passive: true });
 
-  function loop() {
+  function trailLoop() {
     const now = performance.now();
     while (pts.length && now - pts[0].t > LIFE) pts.shift();
     if (tctx) {
@@ -880,13 +690,12 @@
         tctx.fill();
       }
     }
-    requestAnimationFrame(loop);
+    requestAnimationFrame(trailLoop);
   }
-  requestAnimationFrame(loop);
+  requestAnimationFrame(trailLoop);
 
-  // ============================================================
-  //   widgets — moon, time, rain, stars
-  // ============================================================
+  // widgets
+
   const $widget = document.getElementById("widget");
   const $widgetCanvas = document.getElementById("widget-canvas");
   let widgetTimer = 0;
@@ -928,22 +737,15 @@
     return ctx;
   }
 
-  let starsPersist = false;
-  function fireWidget(kind, opts) {
+  function fireWidget(kind) {
     if (kind === activeWidget) return;
     clearWidget();
     activeWidget = kind;
-
-    if (kind === "stars") {
-      starsPersist = !!(opts && opts.persist);
-      runStars();
-      return;
-    }
+    if (kind === "stars") { runStars(); return; }
     if (kind === "void") { runVoid(); return; }
     if (kind === "mirror") { runMirror(); return; }
   }
 
-  // --- stars ---
   function runStars() {
     const ctx = sizeWidgetCanvas();
     const w = innerWidth, h = innerHeight;
@@ -955,10 +757,8 @@
       const angle = Math.random() * Math.PI * 2;
       const drift = 3 + Math.random() * 10;
       stars.push({
-        x: Math.random() * w,
-        y: Math.random() * h,
-        vx: Math.cos(angle) * drift,
-        vy: Math.sin(angle) * drift,
+        x: Math.random() * w, y: Math.random() * h,
+        vx: Math.cos(angle) * drift, vy: Math.sin(angle) * drift,
         r: Math.random() * 1.4 + 0.2,
         twk: Math.random() * Math.PI * 2,
         spd: 0.6 + Math.random() * 1.3,
@@ -970,22 +770,16 @@
       const edge = Math.random();
       let sx, sy, ang;
       if (edge < 0.5) {
-        sx = Math.random() * w;
-        sy = -10;
+        sx = Math.random() * w; sy = -10;
         ang = Math.PI * (0.15 + Math.random() * 0.7);
       } else {
-        sx = w + 10;
-        sy = Math.random() * h * 0.5;
+        sx = w + 10; sy = Math.random() * h * 0.5;
         ang = Math.PI * (0.55 + Math.random() * 0.4);
       }
       const speed = 400 + Math.random() * 350;
       shooters.push({
-        x: sx, y: sy,
-        vx: Math.cos(ang) * speed,
-        vy: Math.sin(ang) * speed,
-        life: 1.0,
-        len: 60 + Math.random() * 80,
-        size: 0.8 + Math.random() * 1.2,
+        x: sx, y: sy, vx: Math.cos(ang) * speed, vy: Math.sin(ang) * speed,
+        life: 1.0, len: 60 + Math.random() * 80, size: 0.8 + Math.random() * 1.2,
       });
     }
 
@@ -993,7 +787,6 @@
     let shootAcc = 0;
     const start = performance.now();
     let lastT = start;
-    const DUR = 7000;
 
     function step(now) {
       const dt = (now - lastT) / 1000;
@@ -1047,16 +840,11 @@
         ctx.fill();
       }
 
-      if (starsPersist || now - start < DUR) {
-        widgetRAF = requestAnimationFrame(step);
-      } else {
-        clearWidget();
-      }
+      widgetRAF = requestAnimationFrame(step);
     }
     widgetRAF = requestAnimationFrame(step);
   }
 
-  // --- void ---
   function runVoid() {
     document.body.classList.add("void-mode");
     voidRevealTimer = setTimeout(() => {
@@ -1073,8 +861,6 @@
     widgetTimer = setTimeout(clearWidget, 8000);
   }
 
-
-  // --- mirror ---
   function runMirror() {
     document.body.classList.add("mirror-mode");
     $widgetCanvas.classList.add("show");
@@ -1147,7 +933,6 @@
             }
           }
 
-          // vignette
           const vgrad = ctx.createRadialGradient(dw/2, dh/2, dw*0.25, dw/2, dh/2, dw*0.7);
           vgrad.addColorStop(0, "rgba(10,10,10,0)");
           vgrad.addColorStop(1, "rgba(10,10,10,0.6)");
@@ -1171,33 +956,21 @@
       });
   }
 
-
-  // ============================================================
-  //   global: block image dragging / drag-select rectangles
-  // ============================================================
   document.addEventListener("dragstart", (e) => {
     if (e.target && (e.target.tagName === "IMG" || e.target.tagName === "CANVAS")) {
       e.preventDefault();
     }
   });
 
-  // ============================================================
-  //   idle stillness — 60s of no interaction on home, the bio
-  //   slowly fades to nothing. move and it returns.
-  // ============================================================
+  // idle: 15s without interaction on home triggers void
+
   let idleTimer = 0;
   let idleActive = false;
-  const $bio = document.querySelector(".bio");
 
   function resetIdle() {
     clearTimeout(idleTimer);
-    if (idleActive) {
-      idleActive = false;
-      clearWidget();
-    }
-    if (!$home.hidden) {
-      idleTimer = setTimeout(startIdle, 15000);
-    }
+    if (idleActive) { idleActive = false; clearWidget(); }
+    if (!$home.hidden) { idleTimer = setTimeout(startIdle, 15000); }
   }
   function startIdle() {
     if ($home.hidden) return;
@@ -1208,9 +981,8 @@
   addEventListener("keydown", resetIdle);
   addEventListener("pointerdown", resetIdle, { passive: true });
 
-  // ============================================================
-  //   mobile shake — shake your phone for a random surprise
-  // ============================================================
+  // mobile shake triggers void
+
   if (window.DeviceMotionEvent) {
     let lastShake = 0;
     function onShake(e) {
@@ -1233,12 +1005,6 @@
       addEventListener("devicemotion", onShake, { passive: true });
     }
   }
-
-  // ============================================================
-  //   initial render
-  // ============================================================
-  console.log("%c" + "\n  eric-li.co\n", "font-family:Georgia,serif;font-size:14px;color:#111;letter-spacing:0.08em");
-  console.log("%c  the surface is quiet. that is by design.\n", "font-family:Georgia,serif;font-size:11px;color:#999;letter-spacing:0.04em");
 
   render(currentPath());
   resetIdle();
