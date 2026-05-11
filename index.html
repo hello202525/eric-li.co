@@ -910,7 +910,7 @@
   let activeWidget = "";
   let voidRevealTimer = 0;
   let mirrorStream = null;
-  let supernovaGL = null;
+  let supernovaCanvas = null;
   let supernovaCleanup = null;
 
   function clearWidget() {
@@ -923,11 +923,9 @@
     document.body.classList.remove("stars-mode", "void-mode", "supernova-mode", "mirror-mode");
     $widget.innerHTML = "";
     if (supernovaCleanup) { supernovaCleanup(); supernovaCleanup = null; }
-    if (supernovaGL) {
-      try { const ext = supernovaGL.getExtension("WEBGL_lose_context"); if (ext) ext.loseContext(); } catch(e){}
-      const c = supernovaGL.canvas;
-      if (c && c.parentNode) c.parentNode.removeChild(c);
-      supernovaGL = null;
+    if (supernovaCanvas) {
+      if (supernovaCanvas.parentNode) supernovaCanvas.parentNode.removeChild(supernovaCanvas);
+      supernovaCanvas = null;
     }
     if (mirrorStream) {
       mirrorStream.getTracks().forEach(t => t.stop());
@@ -1099,34 +1097,41 @@
     widgetTimer = setTimeout(clearWidget, 8000);
   }
 
-  // --- supernova (WebGL GPU plasma simulation) ---
+  // --- supernova (strange attractor generative art) ---
   function runSupernova() {
     document.body.classList.add("supernova-mode");
 
     const canvas = document.createElement("canvas");
     canvas.style.cssText = "position:fixed;inset:0;width:100%;height:100%;z-index:7;cursor:crosshair;";
     document.body.appendChild(canvas);
-    const gl = canvas.getContext("webgl2", { alpha: false, antialias: false, preserveDrawingBuffer: false });
-    if (!gl) { clearWidget(); return; }
-    gl.getExtension("EXT_color_buffer_float");
-    supernovaGL = gl;
+    supernovaCanvas = canvas;
 
-    const W = Math.round(innerWidth * 0.5);
-    const H = Math.round(innerHeight * 0.5);
-    canvas.width = W;
-    canvas.height = H;
-    gl.viewport(0, 0, W, H);
+    const W = canvas.width = innerWidth;
+    const H = canvas.height = innerHeight;
+    const ctx = canvas.getContext("2d");
 
-    let mx = 0.5, my = 0.5, prevMx = 0.5, prevMy = 0.5;
+    const NUM = 4000;
+    const TRAIL_LEN = 40;
+
+    // Attractor parameters
+    let bParam = 0.208;
+    let bTarget = 0.208;
+    let rotAngle = 0;
+    let rotSpeed = 0.003;
+    let camDist = 8.0;
+
+    // Mouse state
+    let mx = 0.5, my = 0.5;
     let mouseDown = false;
-    let impulseFrames = 0;
-    let mouseSpeed = 0;
-    const onMM = (e) => {
-      prevMx = mx; prevMy = my;
-      mx = e.clientX / innerWidth; my = 1 - e.clientY / innerHeight;
-      mouseSpeed = Math.sqrt((mx-prevMx)**2 + (my-prevMy)**2);
+    let shockTime = 0;
+    let shockParam = 0;
+
+    const onMM = (e) => { mx = e.clientX / W; my = e.clientY / H; };
+    const onMD = (e) => {
+      mouseDown = true;
+      shockTime = 1.0;
+      shockParam = (Math.random() - 0.5) * 0.08;
     };
-    const onMD = () => { mouseDown = true; impulseFrames = 15; };
     const onMU = () => { mouseDown = false; };
     window.addEventListener("pointermove", onMM);
     window.addEventListener("pointerdown", onMD);
@@ -1137,419 +1142,145 @@
       window.removeEventListener("pointerup", onMU);
     };
 
-    // --- Shader sources ---
-    const VERT = `#version 300 es
-    in vec2 a_pos;
-    out vec2 v_uv;
-    void main(){ v_uv = a_pos * 0.5 + 0.5; gl_Position = vec4(a_pos, 0, 1); }`;
-
-    const SIM_FRAG = `#version 300 es
-    precision highp float;
-    uniform sampler2D u_state;
-    uniform vec2 u_res;
-    uniform vec2 u_mouse;
-    uniform vec2 u_mousePrev;
-    uniform float u_gravity;
-    uniform float u_impulse;
-    uniform float u_dt;
-    uniform float u_time;
-    in vec2 v_uv;
-    out vec4 fragColor;
-
-    // Simplex-style noise
-    vec3 mod289(vec3 x){return x-floor(x*(1./289.))*289.;}
-    vec4 mod289(vec4 x){return x-floor(x*(1./289.))*289.;}
-    vec4 perm(vec4 x){return mod289(((x*34.)+1.)*x);}
-    float noise3(vec3 p){
-      vec3 a=floor(p),d=p-a;
-      d=d*d*(3.-2.*d);
-      vec4 b=a.xxyy+vec4(0,1,0,1);
-      vec4 k1=perm(b.xyxy);
-      vec4 k2=perm(k1.xyxy+b.zzww);
-      vec4 c=k2+a.zzzz;
-      vec4 k3=perm(c);
-      vec4 k4=perm(c+1.);
-      vec4 o1=fract(k3*(1./41.));
-      vec4 o2=fract(k4*(1./41.));
-      vec4 o3=o2*d.z+o1*(1.-d.z);
-      vec2 o4=o3.yw*d.x+o3.xz*(1.-d.x);
-      return o4.y*d.y+o4.x*(1.-d.y);
-    }
-    float fbm(vec3 p){
-      float v=0.,a=0.5;
-      for(int i=0;i<5;i++){v+=a*noise3(p);p*=2.1;a*=0.5;}
-      return v;
+    // Initialize particles in a sphere around the attractor
+    const particles = [];
+    for (let i = 0; i < NUM; i++) {
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos(2 * Math.random() - 1);
+      const r = 0.5 + Math.random() * 2.5;
+      particles.push({
+        x: Math.sin(phi) * Math.cos(theta) * r,
+        y: Math.sin(phi) * Math.sin(theta) * r,
+        z: Math.cos(phi) * r,
+        trail: [],
+        speed: 0,
+      });
     }
 
-    void main(){
-      vec2 px = 1.0 / u_res;
-      vec4 state = texture(u_state, v_uv);
-      vec2 vel = state.xy;
-      float density = state.z;
-      float temp = state.w;
-
-      // Gravity toward mouse — strong pull when holding
-      vec2 delta = u_mouse - v_uv;
-      float aspect = u_res.x / u_res.y;
-      delta.x *= aspect;
-      float r = length(delta);
-      float gForce = u_gravity / (r * r + 0.003);
-      gForce = min(gForce, 25.0);
-      vel += normalize(delta + 0.0001) * gForce * u_dt;
-
-      // Mouse movement injects energy — painting plasma along trail
-      float mouseDist = length(v_uv - u_mouse);
-      float mouseInject = exp(-mouseDist * mouseDist * 80.0) * u_gravity * 0.15;
-      vec2 mouseVel = u_mouse - u_mousePrev;
-      float mSpeed = length(mouseVel);
-      density += mouseInject * (0.1 + mSpeed * 2.0);
-      temp += mouseInject * (0.2 + mSpeed * 3.0);
-      if(mSpeed > 0.001) vel += normalize(mouseVel) * mouseInject * 2.0;
-
-      // Click impulse — shockwave (injects velocity more than temperature)
-      if(u_impulse > 0.05){
-        float impR = length(v_uv - u_mouse);
-        float impStr = u_impulse * exp(-impR * impR * 8.0) * 6.0;
-        vec2 impDir = normalize(v_uv - u_mouse + 0.0001);
-        vel += impDir * impStr;
-        temp += impStr * 0.6;
-        density += impStr * 0.3;
-      }
-
-      // Advection
-      vec2 prevUV = v_uv - vel * u_dt * 0.5;
-      vec4 advected = texture(u_state, prevUV);
-
-      // Heavy diffusion to eliminate hard edges
-      vec4 L = texture(u_state, v_uv + vec2(-px.x, 0));
-      vec4 R = texture(u_state, v_uv + vec2( px.x, 0));
-      vec4 U = texture(u_state, v_uv + vec2(0,  px.y));
-      vec4 D = texture(u_state, v_uv + vec2(0, -px.y));
-      vec4 TL = texture(u_state, v_uv + vec2(-px.x, px.y));
-      vec4 TR = texture(u_state, v_uv + vec2( px.x, px.y));
-      vec4 BL = texture(u_state, v_uv + vec2(-px.x, -px.y));
-      vec4 BR = texture(u_state, v_uv + vec2( px.x, -px.y));
-      vec4 neighbors = (L + R + U + D) * 0.125 + (TL + TR + BL + BR) * 0.0625;
-      vec4 diffused = mix(advected, neighbors * (1.0/0.75), 0.35);
-
-      vel = diffused.xy;
-      density = diffused.z;
-      temp = diffused.w;
-
-      // Pressure correction
-      float divR2 = R.x - L.x;
-      float divU2 = U.y - D.y;
-      vel -= vec2(divR2, divU2) * 0.15;
-
-      // Smooth curl noise — gentle swirling, no hard shear
-      float nR = fbm(vec3((v_uv + vec2(px.x*2.0,0)) * 3.0, u_time * 0.15));
-      float nL = fbm(vec3((v_uv - vec2(px.x*2.0,0)) * 3.0, u_time * 0.15));
-      float nU = fbm(vec3((v_uv + vec2(0,px.y*2.0)) * 3.0, u_time * 0.15));
-      float nD2 = fbm(vec3((v_uv - vec2(0,px.y*2.0)) * 3.0, u_time * 0.15));
-      vec2 curl = vec2(nU - nD2, -(nR - nL)) * 0.04;
-      vel += curl;
-
-      // Large-scale slow drift
-      float s1 = fbm(vec3(v_uv * 1.5, u_time * 0.06)) - 0.5;
-      float s2 = fbm(vec3(v_uv.yx * 1.5, u_time * 0.06 + 10.0)) - 0.5;
-      vel += vec2(s1, s2) * 0.015;
-
-      // Central energy source — just enough to keep it alive, not blinding
-      float cDist = length(v_uv - vec2(0.5));
-      float feed = exp(-cDist * cDist * 18.0) * 0.002;
-      density += feed;
-      temp += feed * 0.3;
-
-      // Drifting secondary sources — small hot points for color variety
-      vec2 src2 = vec2(0.5 + sin(u_time*0.13)*0.2, 0.5 + cos(u_time*0.17)*0.15);
-      float d2 = length(v_uv - src2);
-      density += exp(-d2*d2 * 50.0) * 0.002;
-      temp += exp(-d2*d2 * 50.0) * 0.004;
-
-      vec2 src3 = vec2(0.5 + cos(u_time*0.11)*0.25, 0.5 + sin(u_time*0.19)*0.2);
-      float d3 = length(v_uv - src3);
-      density += exp(-d3*d3 * 50.0) * 0.0015;
-
-      // Buoyancy + lateral wind
-      vel.y += temp * 0.025;
-      vel.x += sin(v_uv.y * 6.28 + u_time * 0.3) * temp * 0.005;
-
-      // Differential decay: temp fades fast (color cools), density persists (structure stays)
-      vel *= 0.992;
-      density *= 0.996;
-      temp *= 0.97;
-
-      // No hard boundary — just gentle radial fade from center
-      float fromCenter = length(v_uv - vec2(0.5));
-      float fade = smoothstep(0.7, 0.3, fromCenter);
-      density *= mix(0.99, 1.0, fade);
-      temp *= mix(0.98, 1.0, fade);
-
-      fragColor = vec4(vel, max(density,0.0), max(temp,0.0));
-    }`;
-
-    const DISP_FRAG = `#version 300 es
-    precision highp float;
-    uniform sampler2D u_state;
-    uniform vec2 u_res;
-    uniform vec2 u_mouse;
-    uniform float u_gravity;
-    uniform float u_time;
-    in vec2 v_uv;
-    out vec4 fragColor;
-
-    vec3 blackbody(float t){
-      // Attempt approximate Planck locus: t is 0..1 mapping to 1000K..50000K
-      float T = 1000.0 + t * 49000.0;
-      float x = T / 100.0;
-      vec3 c;
-      if(x <= 66.0){
-        c.r = 1.0;
-        c.g = clamp((99.47*log(x)-161.12)/255.0, 0.0, 1.0);
-        c.b = x <= 19.0 ? 0.0 : clamp((138.52*log(x-10.0)-305.04)/255.0, 0.0, 1.0);
+    // Color palette: speed mapped to hue
+    function speedColor(speed, alpha) {
+      const s = Math.min(speed * 8.0, 1.0);
+      let r, g, b;
+      if (s < 0.33) {
+        // Deep violet to magenta
+        const t = s / 0.33;
+        r = Math.round(40 + t * 80);
+        g = Math.round(10 + t * 10);
+        b = Math.round(80 + t * 100);
+      } else if (s < 0.66) {
+        // Magenta to cyan
+        const t = (s - 0.33) / 0.33;
+        r = Math.round(120 - t * 90);
+        g = Math.round(20 + t * 180);
+        b = Math.round(180 + t * 60);
       } else {
-        c.r = clamp(329.7*pow(x-60.0,-0.133)/255.0, 0.0, 1.0);
-        c.g = clamp(288.12*pow(x-60.0,-0.0755)/255.0, 0.0, 1.0);
-        c.b = 1.0;
+        // Cyan to warm white-gold
+        const t = (s - 0.66) / 0.34;
+        r = Math.round(30 + t * 225);
+        g = Math.round(200 + t * 55);
+        b = Math.round(240 - t * 100);
       }
-      return c;
+      return `rgba(${r},${g},${b},${alpha})`;
     }
 
-    // Noise for filament overlay
-    float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7)))*43758.5453); }
-    float vnoise(vec2 p){
-      vec2 i=floor(p), f=fract(p);
-      f=f*f*(3.0-2.0*f);
-      return mix(mix(hash(i),hash(i+vec2(1,0)),f.x), mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x), f.y);
-    }
-    float filament(vec2 p, float t){
-      float v=0.0, a=0.6;
-      mat2 m = mat2(1.6,1.2,-1.2,1.6);
-      for(int i=0;i<6;i++){ v+=a*abs(vnoise(p)-0.5)*2.0; p=m*p; a*=0.5; }
-      return v;
-    }
+    // 3D rotation + perspective projection
+    function project(x, y, z) {
+      // Rotate around Y axis (slow orbit)
+      const cosR = Math.cos(rotAngle), sinR = Math.sin(rotAngle);
+      const rx = x * cosR - z * sinR;
+      const rz = x * sinR + z * cosR;
+      // Slight tilt
+      const cosT = Math.cos(0.3), sinT = Math.sin(0.3);
+      const ry = y * cosT - rz * sinT;
+      const rz2 = y * sinT + rz * cosT;
 
-    void main(){
-      vec2 uv = v_uv;
-
-      // Gravitational lensing
-      vec2 delta = u_mouse - uv;
-      float aspect = u_res.x / u_res.y;
-      delta.x *= aspect;
-      float r = length(delta);
-      float lensStr = u_gravity * 0.005 / (r * r + 0.003);
-      lensStr = min(lensStr, 0.25);
-      vec2 lensDir = normalize(delta + 0.0001) * lensStr * vec2(1.0/aspect, 1.0);
-      uv += lensDir;
-
-      // Chromatic aberration — splits channels near gravity well
-      float chromStr = lensStr * 0.4;
-      vec2 chromOff = lensDir * chromStr;
-      vec4 stateR = texture(u_state, uv + chromOff * 0.5);
-      vec4 stateG = texture(u_state, uv);
-      vec4 stateB = texture(u_state, uv - chromOff * 0.5);
-
-      float densityR = stateR.z, tempR = stateR.w, speedR = length(stateR.xy);
-      float densityG = stateG.z, tempG = stateG.w, speedG = length(stateG.xy);
-      float densityB = stateB.z, tempB = stateB.w, speedB = length(stateB.xy);
-
-      // Emission: density provides structure, temp provides brightness
-      float emR = densityR * 0.8 + tempR * 1.2 + speedR * 0.5;
-      float emG = densityG * 0.8 + tempG * 1.2 + speedG * 0.5;
-      float emB = densityB * 0.8 + tempB * 1.2 + speedB * 0.5;
-
-      // Temperature to color: low range = deep reds, mid = orange, high = white
-      // Using a wider mapping so most of the plasma sits in the red-orange range
-      float tR = clamp(tempR * 1.5 + speedR * 0.3, 0.0, 1.0);
-      float tG = clamp(tempG * 1.5 + speedG * 0.3, 0.0, 1.0);
-      float tB = clamp(tempB * 1.5 + speedB * 0.3, 0.0, 1.0);
-
-      vec3 col;
-      col.r = blackbody(tR).r * emR;
-      col.g = blackbody(tG).g * emG;
-      col.b = blackbody(tB).b * emB;
-
-      // Blue-violet tint in fast regions
-      col += vec3(0.05, 0.02, 0.15) * speedG * 1.5;
-
-      // Deep red/amber in dense cool regions (most of the nebula)
-      float coolDense = densityG * (1.0 - clamp(tempG * 2.0, 0.0, 1.0));
-      col += vec3(0.2, 0.04, 0.01) * coolDense;
-
-      // Bloom
-      vec2 px = 1.0 / u_res;
-      vec3 bloom = vec3(0.0);
-      for(int i = 1; i <= 8; i++){
-        float fi = float(i);
-        float w = 1.0 / (fi * 1.2 + 1.0);
-        float off = fi * 2.5;
-        vec4 sR = texture(u_state, uv + vec2(off*px.x, 0));
-        vec4 sL = texture(u_state, uv - vec2(off*px.x, 0));
-        vec4 sU = texture(u_state, uv + vec2(0, off*px.y));
-        vec4 sD = texture(u_state, uv - vec2(0, off*px.y));
-        // Diagonal taps for richer bloom
-        vec4 sDR = texture(u_state, uv + vec2(off*px.x, off*px.y)*0.7);
-        vec4 sDL = texture(u_state, uv + vec2(-off*px.x, off*px.y)*0.7);
-        bloom += blackbody(clamp(sR.w*3.5,0.0,1.0)) * (sR.z+sR.w) * w;
-        bloom += blackbody(clamp(sL.w*3.5,0.0,1.0)) * (sL.z+sL.w) * w;
-        bloom += blackbody(clamp(sU.w*3.5,0.0,1.0)) * (sU.z+sU.w) * w;
-        bloom += blackbody(clamp(sD.w*3.5,0.0,1.0)) * (sD.z+sD.w) * w;
-        bloom += blackbody(clamp(sDR.w*3.5,0.0,1.0)) * (sDR.z+sDR.w) * w * 0.5;
-        bloom += blackbody(clamp(sDL.w*3.5,0.0,1.0)) * (sDL.z+sDL.w) * w * 0.5;
-      }
-      col += bloom * 0.1;
-
-      // Wispy filament overlay — ghostly tendrils
-      float fil = filament(v_uv * 4.0 + u_time * 0.05, u_time);
-      float filMask = densityG * 0.5 + tempG * 0.3;
-      col += vec3(0.4, 0.15, 0.05) * fil * filMask * 0.3;
-
-      // Tone mapping — ACES-inspired
-      col = (col * (2.51 * col + 0.03)) / (col * (2.43 * col + 0.59) + 0.14);
-      col = clamp(col, 0.0, 1.0);
-
-      // Color grading — subtle teal in shadows, warmth in highlights
-      vec3 shadows = vec3(0.02, 0.04, 0.06);
-      vec3 highlights = vec3(1.02, 0.98, 0.95);
-      float lum = dot(col, vec3(0.2126, 0.7152, 0.0722));
-      col = mix(col + shadows * (1.0 - lum), col * highlights, lum);
-
-      fragColor = vec4(col, 1.0);
-    }`;
-
-    // --- WebGL setup ---
-    function compileShader(src, type) {
-      const s = gl.createShader(type);
-      gl.shaderSource(s, src);
-      gl.compileShader(s);
-      return s;
-    }
-    function createProgram(vs, fs) {
-      const p = gl.createProgram();
-      gl.attachShader(p, compileShader(vs, gl.VERTEX_SHADER));
-      gl.attachShader(p, compileShader(fs, gl.FRAGMENT_SHADER));
-      gl.linkProgram(p);
-      return p;
+      const perspective = camDist / (camDist + rz2 + 4.0);
+      const sx = W * 0.5 + rx * perspective * W * 0.12;
+      const sy = H * 0.5 + ry * perspective * H * 0.12;
+      return { sx, sy, depth: rz2, perspective };
     }
 
-    const simProg = createProgram(VERT, SIM_FRAG);
-    const dispProg = createProgram(VERT, DISP_FRAG);
-
-    // Fullscreen quad
-    const quadBuf = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, quadBuf);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
-
-    function setupAttrib(prog) {
-      const loc = gl.getAttribLocation(prog, "a_pos");
-      gl.enableVertexAttribArray(loc);
-      gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
-    }
-
-    // Ping-pong framebuffers
-    function createFBO() {
-      const tex = gl.createTexture();
-      gl.bindTexture(gl.TEXTURE_2D, tex);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, W, H, 0, gl.RGBA, gl.HALF_FLOAT, null);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-      const fbo = gl.createFramebuffer();
-      gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
-      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
-      return { tex, fbo };
-    }
-    let fboA = createFBO();
-    let fboB = createFBO();
-
-    // Seed initial state with fBM noise via a one-time JS fill
-    const initData = new Float32Array(W * H * 4);
-    for (let y = 0; y < H; y++) {
-      for (let x = 0; x < W; x++) {
-        const idx = (y * W + x) * 4;
-        const u = x / W, v = y / H;
-        const cx2 = u - 0.5, cy2 = v - 0.5;
-        const dist = Math.sqrt(cx2*cx2 + cy2*cy2);
-        const falloff = Math.exp(-dist * dist * 8);
-        const n1 = Math.sin(u*17.3 + v*13.7) * Math.cos(u*23.1 - v*7.3);
-        const n2 = Math.sin(u*31.1 + v*29.3 + 1.7) * Math.cos(u*11.3 + v*19.1);
-        const n3 = Math.sin(u*43.7 - v*37.3 + 3.1) * Math.cos(u*53.1 + v*41.7);
-        const density = (0.2 + 0.5 * Math.abs(n1 + n2 * 0.5 + n3 * 0.25)) * falloff;
-        const temperature = density * 0.15 * falloff;
-        initData[idx] = (n2 * 0.1) * falloff;     // vel.x
-        initData[idx+1] = (n3 * 0.1) * falloff;   // vel.y
-        initData[idx+2] = density;                  // density
-        initData[idx+3] = temperature;              // temperature
-      }
-    }
-    gl.bindTexture(gl.TEXTURE_2D, fboA.tex);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, W, H, 0, gl.RGBA, gl.HALF_FLOAT, initData);
-
-    // Uniform locations
-    const simLocs = {
-      state: gl.getUniformLocation(simProg, "u_state"),
-      res: gl.getUniformLocation(simProg, "u_res"),
-      mouse: gl.getUniformLocation(simProg, "u_mouse"),
-      mousePrev: gl.getUniformLocation(simProg, "u_mousePrev"),
-      gravity: gl.getUniformLocation(simProg, "u_gravity"),
-      impulse: gl.getUniformLocation(simProg, "u_impulse"),
-      dt: gl.getUniformLocation(simProg, "u_dt"),
-      time: gl.getUniformLocation(simProg, "u_time"),
-    };
-    const dispLocs = {
-      state: gl.getUniformLocation(dispProg, "u_state"),
-      res: gl.getUniformLocation(dispProg, "u_res"),
-      mouse: gl.getUniformLocation(dispProg, "u_mouse"),
-      gravity: gl.getUniformLocation(dispProg, "u_gravity"),
-      time: gl.getUniformLocation(dispProg, "u_time"),
-    };
-
-    let lastT = performance.now();
-    let time = 0;
-
-    function step(now) {
+    function step() {
       if (activeWidget !== "supernova") return;
-      const dt = Math.min(0.033, (now - lastT) / 1000);
-      lastT = now;
-      time += dt;
 
-      const grav = mouseDown ? 8.0 : (0.5 + mouseSpeed * 40.0);
-      const imp = impulseFrames > 0 ? (impulseFrames / 15.0) : 0.0;
-      if (impulseFrames > 0) impulseFrames--;
+      // Fade: semi-transparent black overlay for trail persistence
+      ctx.globalCompositeOperation = "source-over";
+      ctx.fillStyle = "rgba(0, 0, 0, 0.045)";
+      ctx.fillRect(0, 0, W, H);
+      ctx.globalCompositeOperation = "lighter";
 
-      // Simulation pass
-      gl.bindFramebuffer(gl.FRAMEBUFFER, fboB.fbo);
-      gl.useProgram(simProg);
-      gl.bindBuffer(gl.ARRAY_BUFFER, quadBuf);
-      setupAttrib(simProg);
-      gl.activeTexture(gl.TEXTURE0);
-      gl.bindTexture(gl.TEXTURE_2D, fboA.tex);
-      gl.uniform1i(simLocs.state, 0);
-      gl.uniform2f(simLocs.res, W, H);
-      gl.uniform2f(simLocs.mouse, mx, my);
-      gl.uniform2f(simLocs.mousePrev, prevMx, prevMy);
-      gl.uniform1f(simLocs.gravity, grav);
-      gl.uniform1f(simLocs.impulse, imp);
-      gl.uniform1f(simLocs.dt, dt);
-      gl.uniform1f(simLocs.time, time);
-      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+      // Smooth parameter interpolation
+      bTarget = 0.185 + mx * 0.06 + (mouseDown ? shockParam : 0);
+      bParam += (bTarget - bParam) * 0.02;
 
-      // Display pass
-      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-      gl.useProgram(dispProg);
-      gl.bindBuffer(gl.ARRAY_BUFFER, quadBuf);
-      setupAttrib(dispProg);
-      gl.activeTexture(gl.TEXTURE0);
-      gl.bindTexture(gl.TEXTURE_2D, fboB.tex);
-      gl.uniform1i(dispLocs.state, 0);
-      gl.uniform2f(dispLocs.res, W, H);
-      gl.uniform2f(dispLocs.mouse, mx, my);
-      gl.uniform1f(dispLocs.gravity, grav);
-      gl.uniform1f(dispLocs.time, time);
-      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+      // Shock decay
+      if (shockTime > 0) shockTime *= 0.96;
+      if (shockTime < 0.01) { shockTime = 0; shockParam *= 0.9; }
 
-      const tmp = fboA; fboA = fboB; fboB = tmp;
+      // Camera orbit
+      rotAngle += rotSpeed + (my - 0.5) * 0.002;
+
+      // Mouse gravity target in 3D
+      const gravX = (mx - 0.5) * 6.0;
+      const gravY = (my - 0.5) * 6.0;
+
+      const dt = 0.035;
+      const b = bParam + shockTime * shockParam * 3.0;
+
+      for (let i = 0; i < NUM; i++) {
+        const p = particles[i];
+
+        // Thomas' cyclically symmetric attractor
+        const dx = -b * p.x + Math.sin(p.y);
+        const dy = -b * p.y + Math.sin(p.z);
+        const dz = -b * p.z + Math.sin(p.x);
+
+        p.x += dx * dt;
+        p.y += dy * dt;
+        p.z += dz * dt;
+
+        // Mouse gravity pull when holding
+        if (mouseDown) {
+          const pullX = gravX - p.x;
+          const pullY = gravY - p.y;
+          const pullDist = Math.sqrt(pullX * pullX + pullY * pullY + 0.1);
+          const pullStr = 0.015 / (pullDist * 0.5 + 0.1);
+          p.x += pullX * pullStr;
+          p.y += pullY * pullStr;
+        }
+
+        p.speed = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+        // Store trail
+        const proj = project(p.x, p.y, p.z);
+        p.trail.push({ sx: proj.sx, sy: proj.sy, depth: proj.depth, speed: p.speed });
+        if (p.trail.length > TRAIL_LEN) p.trail.shift();
+
+        // Draw trail
+        if (p.trail.length < 2) continue;
+        const depthAlpha = Math.max(0.0, Math.min(1.0, 1.0 - (proj.depth + 3.0) / 10.0));
+        if (depthAlpha < 0.02) continue;
+
+        ctx.beginPath();
+        ctx.moveTo(p.trail[0].sx, p.trail[0].sy);
+        for (let j = 1; j < p.trail.length; j++) {
+          ctx.lineTo(p.trail[j].sx, p.trail[j].sy);
+        }
+        const trailAlpha = depthAlpha * 0.35;
+        ctx.strokeStyle = speedColor(p.speed, trailAlpha);
+        ctx.lineWidth = 0.6 + depthAlpha * 0.8;
+        ctx.stroke();
+
+        // Bright head
+        if (depthAlpha > 0.1) {
+          const lastPt = p.trail[p.trail.length - 1];
+          ctx.beginPath();
+          ctx.arc(lastPt.sx, lastPt.sy, 0.8 + depthAlpha * 1.2, 0, Math.PI * 2);
+          ctx.fillStyle = speedColor(p.speed, depthAlpha * 0.6);
+          ctx.fill();
+        }
+      }
+
       widgetRAF = requestAnimationFrame(step);
     }
     widgetRAF = requestAnimationFrame(step);
