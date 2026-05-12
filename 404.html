@@ -2848,8 +2848,11 @@ void main(){
     sessionStorage.setItem("bio-revealed", "1");
     const bioEl = document.querySelector(".bio");
     if (bioEl && !$home.hidden) {
-      const original = bioEl.innerHTML;
-      const walker = document.createTreeWalker(bioEl, NodeFilter.SHOW_TEXT, null, false);
+      // only stagger text nodes NOT inside #end (which has its own span setup)
+      const endEl = document.getElementById("end");
+      const walker = document.createTreeWalker(bioEl, NodeFilter.SHOW_TEXT, {
+        acceptNode(n) { return endEl && endEl.contains(n) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT; }
+      }, false);
       const textNodes = [];
       let node;
       while (node = walker.nextNode()) textNodes.push(node);
@@ -2868,15 +2871,17 @@ void main(){
         tn.parentNode.replaceChild(frag, tn);
       }
 
+      // also hide the #end letters initially, then reveal them in sequence
+      const endLetters = endEl ? endEl.querySelectorAll("span") : [];
+      endLetters.forEach(s => { s.style.opacity = "0"; s.style.transition = "opacity 0.25s ease"; });
+      const allSpans = [...spans, ...endLetters];
+
       let idx = 0;
       function revealNext() {
-        if (idx >= spans.length) {
-          setTimeout(() => { bioEl.innerHTML = original; }, 300);
-          return;
-        }
-        spans[idx].style.opacity = "1";
+        if (idx >= allSpans.length) return;
+        allSpans[idx].style.opacity = "1";
         idx++;
-        const ch = spans[idx - 1].textContent;
+        const ch = allSpans[idx - 1].textContent;
         const delay = /[.,!?]/.test(ch) ? 30 : /\s/.test(ch) ? 20 : 14;
         setTimeout(revealNext, delay);
       }
