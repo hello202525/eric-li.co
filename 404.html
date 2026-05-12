@@ -1072,8 +1072,6 @@
     });
 
     // ===== CRASH STATE =====
-    const cDust = [];
-    let cFlash = 0;
 
     // ===== DRIFT WORLD (3rd person astronaut) =====
     const DRIFT_DUR = 35;
@@ -1427,76 +1425,70 @@
       if (phaseT >= dur && !fadeCallback) fadeTo("crash");
     }
 
-    // ======== CRASH (impact + ejection) ========
+    // ======== CRASH (instant impact → eject into space) ========
     function drawCrash(dt) {
-      if (phaseT < 0.08) cFlash = 1;
-      cFlash *= 0.8;
-
-      const dur = 3.5;
+      const dur = 1.8;
       const pr = Math.min(1, phaseT / dur);
-      const ccx = W / 2;
+      const ccx = W / 2, ccy = H / 2;
 
-      ctx.fillStyle = "#030206";
-      ctx.fillRect(0, 0, W, H);
+      // 0-0.15: white flash (impact)
+      // 0.15-1.0: Mars shrinks away below as you tumble backward into space
 
-      // stars
-      if (phaseT > 0.3) {
-        const sa = Math.min(1, (phaseT - 0.3) / 1);
-        for (let i = 0; i < 60; i++) {
-          ctx.fillStyle = "rgba(230,228,220," + (sa * (0.1 + hash(i+700) * 0.25)) + ")";
-          ctx.beginPath(); ctx.arc(hash(i+300)*W, hash(i+400)*H, 0.3+hash(i+600)*0.5, 0, 6.28); ctx.fill();
-        }
-      }
-
-      // Mars surface rushes up then falls away (ejection)
-      let marsY;
-      if (pr < 0.35) {
-        marsY = H + 100 - (pr / 0.35) * (H * 0.35 + 100);
-      } else {
-        const ej = (pr - 0.35) / 0.65;
-        marsY = H * 0.65 + ej * ej * H * 0.8;
-      }
-
-      if (marsY < H + 50) {
-        const marsGrad = ctx.createRadialGradient(ccx, marsY + H * 0.3, 0, ccx, marsY + H * 0.3, H * 0.8);
-        marsGrad.addColorStop(0, "rgba(130,55,30," + Math.min(0.9, 1.2 - pr) + ")");
-        marsGrad.addColorStop(0.4, "rgba(80,35,20," + Math.min(0.7, 1 - pr) + ")");
-        marsGrad.addColorStop(1, "rgba(30,12,8,0)");
-        ctx.fillStyle = marsGrad;
-        ctx.fillRect(0, marsY, W, H - marsY + 50);
-      }
-
-      // camera shake on impact
-      if (phaseT < 0.8) {
-        const shk = (1 - phaseT / 0.8) * 18;
-        ctx.save(); ctx.translate((Math.random()-0.5)*shk, (Math.random()-0.5)*shk);
-      }
-
-      // impact debris flying outward
-      if (phaseT < 0.5 && cDust.length < 150) {
-        for (let i = 0; i < 12; i++) {
-          const ang = Math.random() * 6.28;
-          const spd = 80 + Math.random() * 300;
-          cDust.push({
-            x: ccx + (Math.random()-0.5)*40, y: marsY + (Math.random()-0.5)*20,
-            vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd - 80,
-            life: 1 + Math.random()*0.8, r: 0.5 + Math.random()*3,
-          });
-        }
-      }
-      for (let i = cDust.length - 1; i >= 0; i--) {
-        const d = cDust[i];
-        d.x += d.vx * dt; d.y += d.vy * dt; d.life -= dt * 0.5;
-        if (d.life <= 0) { cDust.splice(i, 1); continue; }
-        ctx.fillStyle = "rgba(180,110,70," + (d.life * 0.4) + ")";
-        ctx.beginPath(); ctx.arc(d.x, d.y, d.r * (0.3 + d.life * 0.7), 0, 6.28); ctx.fill();
-      }
-
-      if (phaseT < 0.8) ctx.restore();
-
-      if (cFlash > 0.01) {
-        ctx.fillStyle = "rgba(255,255,255," + cFlash + ")";
+      if (pr < 0.15) {
+        // blinding white flash
+        const fi = pr / 0.15;
+        const flashA = fi < 0.3 ? fi / 0.3 : 1 - (fi - 0.3) / 0.7;
+        ctx.fillStyle = "rgba(255,240,230," + flashA + ")";
         ctx.fillRect(0, 0, W, H);
+
+        // shake
+        const shk = (1 - fi) * 25;
+        ctx.save();
+        ctx.translate((Math.random() - 0.5) * shk, (Math.random() - 0.5) * shk);
+        ctx.restore();
+      } else {
+        // space background
+        ctx.fillStyle = "#020206";
+        ctx.fillRect(0, 0, W, H);
+
+        // stars appearing
+        const starA = Math.min(1, (pr - 0.15) / 0.3);
+        for (let i = 0; i < 80; i++) {
+          ctx.fillStyle = "rgba(220,225,235," + (starA * (0.1 + hash(i + 700) * 0.3)) + ")";
+          ctx.beginPath();
+          ctx.arc(hash(i + 300) * W, hash(i + 400) * H, 0.2 + hash(i + 600) * 0.5, 0, 6.28);
+          ctx.fill();
+        }
+
+        // Mars: starts filling bottom half, rapidly shrinks to a small dot
+        const ej = (pr - 0.15) / 0.85;
+        const marsR = Math.max(2, (1 - ej * ej) * H * 0.8);
+        const marsY = ccy + ej * ej * H * 0.6;
+
+        const mGrad = ctx.createRadialGradient(ccx, marsY, 0, ccx, marsY, marsR);
+        mGrad.addColorStop(0, "rgba(160,65,28," + Math.max(0.1, 1 - ej * 0.5) + ")");
+        mGrad.addColorStop(0.5, "rgba(120,45,20," + Math.max(0.05, 0.7 - ej * 0.4) + ")");
+        mGrad.addColorStop(0.8, "rgba(70,25,12," + Math.max(0, 0.4 - ej * 0.3) + ")");
+        mGrad.addColorStop(1, "rgba(30,10,5,0)");
+        ctx.fillStyle = mGrad;
+        ctx.beginPath(); ctx.arc(ccx, marsY, marsR, 0, Math.PI * 2); ctx.fill();
+
+        // subtle atmospheric rim on Mars
+        if (marsR > 10) {
+          ctx.strokeStyle = "rgba(200,120,60," + (0.2 * (1 - ej)) + ")";
+          ctx.lineWidth = 1.5;
+          ctx.beginPath(); ctx.arc(ccx, marsY, marsR * 0.95, 0, Math.PI * 2); ctx.stroke();
+        }
+
+        // tumble rotation effect (screen rotates slightly)
+        if (ej < 0.5) {
+          const tumbleA = (1 - ej * 2) * 0.02;
+          ctx.save();
+          ctx.translate(ccx, ccy);
+          ctx.rotate(Math.sin(phaseT * 8) * tumbleA);
+          ctx.translate(-ccx, -ccy);
+          ctx.restore();
+        }
       }
 
       if (phaseT >= dur && !fadeCallback) {
