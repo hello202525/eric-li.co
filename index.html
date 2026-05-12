@@ -990,457 +990,495 @@
       removeEventListener("keyup", ku);
     };
 
+    let fadeAlpha = 0;
+    let fadeTarget = 0;
+    let fadeCallback = null;
+
+    function fadeTo(p) {
+      fadeTarget = 1;
+      fadeCallback = () => { phase = p; phaseT = 0; fadeTarget = 0; };
+    }
     function setPhase(p) { phase = p; phaseT = 0; }
 
-    // ===== 3D ROCKET MODEL =====
-    const rocketEdges = [];
-    const SIDES = 8;
-    const BR = 0.28, NT = -1.7, BT = -0.7, BB = 0.8, NZR = 0.36;
-    for (let i = 0; i < SIDES; i++) {
-      const a1 = (i / SIDES) * Math.PI * 2;
-      const a2 = ((i + 1) / SIDES) * Math.PI * 2;
-      const c1 = Math.cos(a1), s1 = Math.sin(a1);
-      const c2 = Math.cos(a2), s2 = Math.sin(a2);
-      rocketEdges.push([c1*BR, BT, s1*BR, c2*BR, BT, s2*BR]);
-      rocketEdges.push([c1*BR, BB, s1*BR, c2*BR, BB, s2*BR]);
-      rocketEdges.push([c1*NZR, BB+0.15, s1*NZR, c2*NZR, BB+0.15, s2*NZR]);
-      rocketEdges.push([c1*BR, BT, s1*BR, c1*BR, BB, s1*BR]);
-      rocketEdges.push([c1*BR, BT, s1*BR, 0, NT, 0]);
-      rocketEdges.push([c1*BR, BB, s1*BR, c1*NZR, BB+0.15, s1*NZR]);
+    function hash(n) { return ((n * 2654435761) >>> 0) / 4294967296; }
+
+    const FONT = "'Iowan Old Style', 'Palatino Linotype', Georgia, serif";
+
+    // ===== 3D ROCKET =====
+    const rEdges = [];
+    const SI = 10, BR = 0.25, NT = -2.0, BT = -0.8, BB = 0.9, NZR = 0.32;
+    for (let i = 0; i < SI; i++) {
+      const a1 = (i / SI) * Math.PI * 2, a2 = ((i + 1) / SI) * Math.PI * 2;
+      const c1 = Math.cos(a1), s1 = Math.sin(a1), c2 = Math.cos(a2), s2 = Math.sin(a2);
+      rEdges.push([c1*BR, BT, s1*BR, c2*BR, BT, s2*BR]);
+      rEdges.push([c1*BR, BB, s1*BR, c2*BR, BB, s2*BR]);
+      rEdges.push([c1*NZR, BB+0.12, s1*NZR, c2*NZR, BB+0.12, s2*NZR]);
+      rEdges.push([c1*BR, BT, s1*BR, c1*BR, BB, s1*BR]);
+      rEdges.push([c1*BR, BT, s1*BR, 0, NT, 0]);
+      rEdges.push([c1*BR, BB, s1*BR, c1*NZR, BB+0.12, s1*NZR]);
     }
-    for (let b = 1; b <= 2; b++) {
-      const by = BT + (BB - BT) * (b / 3);
-      for (let i = 0; i < SIDES; i++) {
-        const a1 = (i / SIDES) * Math.PI * 2;
-        const a2 = ((i + 1) / SIDES) * Math.PI * 2;
-        rocketEdges.push([Math.cos(a1)*BR, by, Math.sin(a1)*BR, Math.cos(a2)*BR, by, Math.sin(a2)*BR]);
+    for (let b = 1; b <= 3; b++) {
+      const by = BT + (BB - BT) * (b / 4);
+      for (let i = 0; i < SI; i++) {
+        const a1 = (i / SI) * Math.PI * 2, a2 = ((i + 1) / SI) * Math.PI * 2;
+        rEdges.push([Math.cos(a1)*BR, by, Math.sin(a1)*BR, Math.cos(a2)*BR, by, Math.sin(a2)*BR]);
       }
     }
     for (let i = 0; i < 4; i++) {
       const a = (i / 4) * Math.PI * 2 + Math.PI / 8;
-      const fc = Math.cos(a), fs = Math.sin(a);
-      const tip = BR + 0.45;
-      rocketEdges.push([fc*BR, BB-0.2, fs*BR, fc*tip, BB+0.35, fs*tip]);
-      rocketEdges.push([fc*tip, BB+0.35, fs*tip, fc*BR, BB+0.15, fs*BR]);
-      rocketEdges.push([fc*BR, BB-0.2, fs*BR, fc*BR, BB+0.15, fs*BR]);
+      const fc = Math.cos(a), fs = Math.sin(a), tip = BR + 0.5;
+      rEdges.push([fc*BR, BB-0.25, fs*BR, fc*tip, BB+0.4, fs*tip]);
+      rEdges.push([fc*tip, BB+0.4, fs*tip, fc*BR*0.9, BB+0.12, fs*BR*0.9]);
+      rEdges.push([fc*BR, BB-0.25, fs*BR, fc*BR*0.9, BB+0.12, fs*BR*0.9]);
     }
 
-    function drawRocket3D(cx, cy, rotY, scale, alpha) {
+    function drawRocket(cx, cy, rotY, sc, alpha) {
       const cosR = Math.cos(rotY), sinR = Math.sin(rotY);
-      const fov = 400;
       ctx.lineCap = "round";
-      ctx.lineWidth = 3.5;
-      for (const e of rocketEdges) {
-        const rx1 = e[0]*cosR - e[2]*sinR, rz1 = e[0]*sinR + e[2]*cosR;
-        const rx2 = e[3]*cosR - e[5]*sinR, rz2 = e[3]*sinR + e[5]*cosR;
-        const s1 = fov / (fov + rz1*scale), s2 = fov / (fov + rz2*scale);
-        ctx.strokeStyle = "rgba(140,190,255," + (alpha * 0.1) + ")";
-        ctx.beginPath();
-        ctx.moveTo(cx + rx1*scale*s1, cy + e[1]*scale*s1);
-        ctx.lineTo(cx + rx2*scale*s2, cy + e[4]*scale*s2);
-        ctx.stroke();
-      }
-      ctx.lineWidth = 1.2;
-      for (const e of rocketEdges) {
-        const rx1 = e[0]*cosR - e[2]*sinR, rz1 = e[0]*sinR + e[2]*cosR;
-        const rx2 = e[3]*cosR - e[5]*sinR, rz2 = e[3]*sinR + e[5]*cosR;
-        const s1 = fov / (fov + rz1*scale), s2 = fov / (fov + rz2*scale);
-        const depth = (rz1 + rz2) * 0.5;
-        const da = Math.max(0.25, 1 - depth * 0.35);
-        ctx.strokeStyle = "rgba(210,230,255," + (alpha * da * 0.85) + ")";
-        ctx.beginPath();
-        ctx.moveTo(cx + rx1*scale*s1, cy + e[1]*scale*s1);
-        ctx.lineTo(cx + rx2*scale*s2, cy + e[4]*scale*s2);
-        ctx.stroke();
+      for (let pass = 0; pass < 2; pass++) {
+        ctx.lineWidth = pass === 0 ? 3.2 : 1.0;
+        for (const e of rEdges) {
+          const rx1 = e[0]*cosR - e[2]*sinR, rz1 = e[0]*sinR + e[2]*cosR;
+          const rx2 = e[3]*cosR - e[5]*sinR, rz2 = e[3]*sinR + e[5]*cosR;
+          const f = 450;
+          const p1 = f / (f + rz1*sc), p2 = f / (f + rz2*sc);
+          const depth = (rz1 + rz2) * 0.5;
+          const da = pass === 0 ? alpha * 0.08 : alpha * Math.max(0.2, 1 - depth * 0.4) * 0.8;
+          const col = pass === 0 ? "140,190,255" : "220,235,255";
+          ctx.strokeStyle = "rgba(" + col + "," + da + ")";
+          ctx.beginPath();
+          ctx.moveTo(cx + rx1*sc*p1, cy + e[1]*sc*p1);
+          ctx.lineTo(cx + rx2*sc*p2, cy + e[4]*sc*p2);
+          ctx.stroke();
+        }
       }
     }
 
     // ===== LAUNCH STATE =====
-    let rocketY = H * 0.6;
-    let rocketVel = 0;
+    let rY = H * 0.65, rVel = 0, rRot = 0;
     const exhaust = [];
-    let rocketRot = 0;
+    const bgStars = [];
+    for (let i = 0; i < 180; i++) bgStars.push({ x: hash(i)*W, y: hash(i+999)*H, r: 0.15+hash(i+500)*0.9, b: 0.15+hash(i+250)*0.5 });
 
     // ===== WARP STATE =====
-    const warpStars = [];
-    for (let i = 0; i < 600; i++) {
-      warpStars.push({ x: (Math.random()-0.5)*4, y: (Math.random()-0.5)*4, z: 0.3+Math.random()*5 });
-    }
-    const tunnelRings = [];
-    for (let i = 0; i < 15; i++) {
-      tunnelRings.push({ z: i * 3.5, rot: Math.random() * Math.PI * 0.5 });
-    }
+    const wStars = [];
+    for (let i = 0; i < 500; i++) wStars.push({ x: (Math.random()-0.5)*4, y: (Math.random()-0.5)*4, z: 0.2+Math.random()*6 });
+    const rings = [];
+    for (let i = 0; i < 12; i++) rings.push({ z: i * 4.2, rot: hash(i+77) * Math.PI });
 
     // ===== CRASH STATE =====
-    const crashDust = [];
-    let crashFlash = 0;
+    const cDust = [];
+    let cFlash = 0;
 
     // ===== GAME WORLD =====
-    const WORLD_LEN = 6000;
-    const GROUND = H * 0.72;
-    const TRES = 4;
-    const tLen = Math.ceil(WORLD_LEN / TRES);
+    const WL = 8000, GND = H * 0.72, TR = 3;
+    const tLen = Math.ceil(WL / TR);
     const terr = new Float32Array(tLen);
+
+    // midpoint displacement for natural terrain
+    terr[0] = GND; terr[tLen - 1] = GND + 15;
+    function subdivide(l, r, rough) {
+      if (r - l < 2) return;
+      const m = (l + r) >> 1;
+      terr[m] = (terr[l] + terr[r]) * 0.5 + (Math.random() - 0.5) * rough;
+      subdivide(l, m, rough * 0.62);
+      subdivide(m, r, rough * 0.62);
+    }
+    subdivide(0, tLen - 1, 90);
+    // gentle rolling hills layered on
     for (let i = 0; i < tLen; i++) {
       const x = i / tLen;
-      terr[i] = GROUND
-        + Math.sin(x * 2.3 * Math.PI) * 35
-        + Math.sin(x * 5.7 * Math.PI + 1.2) * 20
-        + Math.sin(x * 13 * Math.PI + 0.7) * 10
-        + Math.sin(x * 29 * Math.PI + 2.1) * 5
-        + (Math.random() - 0.5) * 3;
+      terr[i] += Math.sin(x * 3.1 * Math.PI) * 25 + Math.sin(x * 7.3 * Math.PI + 1) * 12;
     }
-    for (let g = 0; g < 6; g++) {
-      const gx = 600 + g * 800 + Math.random() * 300;
-      const gw = 50 + Math.random() * 50;
-      const gd = 100 + Math.random() * 60;
-      const si = Math.max(0, Math.floor((gx - gw) / TRES));
-      const ei = Math.min(tLen, Math.ceil((gx + gw) / TRES));
+    // craters
+    const craters = [];
+    for (let g = 0; g < 5; g++) {
+      const gx = 800 + g * 1400 + hash(g+33) * 400;
+      const gw = 40 + hash(g+44) * 60;
+      const gd = 80 + hash(g+55) * 80;
+      craters.push({ x: gx, w: gw, d: gd });
+      const si = Math.max(0, Math.floor((gx - gw * 1.2) / TR));
+      const ei = Math.min(tLen, Math.ceil((gx + gw * 1.2) / TR));
       for (let i = si; i < ei; i++) {
-        const d = Math.abs(i * TRES - gx) / gw;
+        const d = Math.abs(i * TR - gx) / gw;
         if (d < 1) terr[i] += gd * (1 - d * d);
+        else if (d < 1.2) terr[i] -= gd * 0.15 * (1 - (d - 1) / 0.2);
       }
     }
     function terrY(wx) {
-      const fi = wx / TRES;
+      const fi = wx / TR;
       const i0 = Math.max(0, Math.min(tLen - 1, Math.floor(fi)));
       const i1 = Math.min(tLen - 1, i0 + 1);
       return terr[i0] * (1 - (fi - i0)) + terr[i1] * (fi - i0);
     }
 
+    // natural mountain silhouettes with many points
     const mtnLayers = [];
     for (let L = 0; L < 3; L++) {
-      const arr = [];
-      const cnt = 8 + L * 4;
-      for (let i = 0; i < cnt; i++) {
-        arr.push({
-          x: i * (WORLD_LEN * 1.2 / cnt) + Math.random() * 200,
-          w: 180 + Math.random() * 250 - L * 30,
-          h: 50 + Math.random() * 70 + (2 - L) * 35,
-        });
+      const pts = [];
+      const step = 20 + L * 12;
+      const amp = 40 + (2 - L) * 30;
+      for (let x = -200; x < WL + 400; x += step) {
+        const h = amp * (0.3 + 0.7 * hash(x * 31 + L * 7919));
+        pts.push({ x: x, y: GND - h });
       }
-      mtnLayers.push(arr);
+      mtnLayers.push(pts);
+    }
+
+    // scattered rocks as irregular polygons
+    const rocks = [];
+    for (let i = 0; i < 45; i++) {
+      const rx = 200 + hash(i * 97) * (WL - 600);
+      const rh = 4 + hash(i * 53) * 14;
+      const rw = rh * (0.6 + hash(i * 71) * 0.8);
+      const verts = [];
+      const nv = 5 + Math.floor(hash(i * 37) * 4);
+      for (let v = 0; v < nv; v++) {
+        const a = (v / nv) * Math.PI * 2;
+        const rad = (0.7 + hash(i * 13 + v * 41) * 0.3);
+        verts.push({ x: Math.cos(a) * rw * rad, y: -Math.abs(Math.sin(a)) * rh * rad });
+      }
+      rocks.push({ x: rx, verts: verts });
     }
 
     const gameDust = [];
-    for (let i = 0; i < 70; i++) {
+    for (let i = 0; i < 80; i++) {
       gameDust.push({
-        x: Math.random() * WORLD_LEN,
-        y: GROUND - 280 + Math.random() * 350,
-        vx: 6 + Math.random() * 18,
-        s: 0.4 + Math.random() * 1.8,
-        a: 0.03 + Math.random() * 0.08,
+        x: Math.random() * WL, y: GND - 250 + Math.random() * 350,
+        vx: 4 + Math.random() * 14, s: 0.3 + Math.random() * 1.5,
+        a: 0.02 + Math.random() * 0.06,
       });
     }
 
     const skyStars = [];
-    for (let i = 0; i < 160; i++) {
-      skyStars.push({
-        x: Math.random() * WORLD_LEN * 1.5,
-        y: Math.random() * GROUND * 0.55,
-        r: 0.2 + Math.random() * 1.1,
-        tw: Math.random() * Math.PI * 2,
-      });
+    for (let i = 0; i < 200; i++) {
+      skyStars.push({ x: hash(i+200) * WL * 1.5, y: hash(i+400) * GND * 0.6, r: 0.15 + hash(i+600) * 1.0, tw: hash(i+800) * Math.PI * 2 });
     }
 
-    const MON_X = WORLD_LEN - 350;
-    const MON_W = 28;
-    const MON_H = 90;
-    let monHit = false;
-    let monT = 0;
+    // shooting stars (periodic)
+    const shooters = [];
+    let shootTimer = 4 + Math.random() * 6;
+
+    const MON_X = WL - 400, MON_W = 24, MON_H = 80;
+    let monHit = false, monT = 0;
 
     const P = { x: 80, y: 0, vx: 0, vy: 0, w: 10, h: 22, g: false, face: 1, wt: 0 };
     P.y = terrY(P.x) - P.h;
     let cam = 0;
     const pTrail = [];
 
-    const frocks = [];
-    let fNext = 2 + Math.random() * 3;
-    let fAcc = 0;
-
     // ======== LAUNCH ========
     function drawLaunch(dt) {
-      ctx.fillStyle = "#030305";
+      ctx.fillStyle = "#020204";
       ctx.fillRect(0, 0, W, H);
 
-      for (let i = 0; i < 120; i++) {
-        const sx = ((i * 7919 + 1) % 1000) / 1000 * W;
-        const sy = ((i * 6271 + 3) % 1000) / 1000 * H;
-        const sr = 0.2 + ((i * 3137) % 100) / 100 * 0.8;
-        ctx.fillStyle = "rgba(232,230,223," + (0.2 + ((i * 4397) % 100) / 100 * 0.4) + ")";
-        ctx.beginPath();
-        ctx.arc(sx, sy, sr, 0, Math.PI * 2);
-        ctx.fill();
+      for (const s of bgStars) {
+        ctx.fillStyle = "rgba(232,230,223," + s.b + ")";
+        ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2); ctx.fill();
       }
 
-      rocketRot += dt * 0.5;
-      if (phaseT > 0.6) {
-        rocketVel += 700 * dt;
-        rocketY -= rocketVel * dt;
-      }
+      // phase 0-2s: dark stillness, rocket visible, subtle rumble building
+      // phase 2-2.4s: ignition — bright glow blooms
+      // phase 2.4s+: lift, accelerating
 
-      if (phaseT > 1.2) {
-        const li = Math.min(1, (phaseT - 1.2) / 1.2);
-        for (let i = 0; i < 35; i++) {
-          const angle = ((i * 137.508) % 360) * Math.PI / 180;
-          const dist = 0.25 + ((i * 7 + 3) % 10) / 10 * 0.75;
-          const ox = Math.cos(angle) * W * dist;
-          const oy = Math.sin(angle) * H * dist;
-          ctx.strokeStyle = "rgba(180,210,255," + (li * 0.08) + ")";
-          ctx.lineWidth = 0.8;
-          ctx.beginPath();
-          ctx.moveTo(W/2 + ox, H/2 + oy);
-          ctx.lineTo(W/2 + ox * (1 - li * 0.4), H/2 + oy * (1 - li * 0.4));
-          ctx.stroke();
-        }
-      }
+      const ignitionT = 2.0;
+      const liftT = 2.4;
 
+      // pre-ignition rumble
       let shX = 0, shY = 0;
-      if (phaseT > 0.4) {
-        const si = Math.min(6, (phaseT - 0.4) * 3);
-        shX = (Math.random() - 0.5) * si;
-        shY = (Math.random() - 0.5) * si;
+      if (phaseT > 1.0 && phaseT < ignitionT) {
+        const ri = (phaseT - 1.0) / (ignitionT - 1.0);
+        shX = (Math.random() - 0.5) * ri * 2;
+        shY = (Math.random() - 0.5) * ri * 2;
       }
+      // post-ignition shake intensifies
+      if (phaseT >= ignitionT) {
+        const pi = Math.min(1, (phaseT - ignitionT) / 2);
+        const mag = 2 + pi * 8;
+        shX = (Math.random() - 0.5) * mag;
+        shY = (Math.random() - 0.5) * mag;
+      }
+
       ctx.save();
       ctx.translate(shX, shY);
 
-      const rsx = W / 2, rsy = rocketY;
+      rRot += dt * 0.4;
+      if (phaseT > liftT) {
+        const accelT = phaseT - liftT;
+        rVel += (200 + accelT * 350) * dt;
+        rY -= rVel * dt;
+      }
 
-      if (rocketY > -100) {
-        const intensity = phaseT < 0.6 ? phaseT / 0.6 : 1;
-        for (let i = 0; i < Math.floor(6 * intensity); i++) {
+      const rsx = W / 2, rsy = rY;
+
+      // exhaust (only after ignition)
+      if (phaseT >= ignitionT && rsy > -150) {
+        const power = Math.min(1, (phaseT - ignitionT) / 0.5);
+        const cnt = Math.floor(3 + power * 8);
+        for (let i = 0; i < cnt; i++) {
+          const spread = 6 + power * 12;
           exhaust.push({
-            x: rsx + (Math.random() - 0.5) * 10,
-            y: rsy + 40 * (22 / 22),
-            vx: (Math.random() - 0.5) * 70 * intensity,
-            vy: 60 + Math.random() * 160 * intensity,
-            life: 1,
-            r: 1.5 + Math.random() * 3.5,
-            hot: Math.random() > 0.35,
+            x: rsx + (Math.random() - 0.5) * spread,
+            y: rsy + 42,
+            vx: (Math.random() - 0.5) * 50 * power,
+            vy: 40 + Math.random() * 120 * power,
+            life: 0.6 + Math.random() * 0.5,
+            r: 1 + Math.random() * 3.5,
+            hot: Math.random() > 0.3,
           });
         }
       }
 
       for (let i = exhaust.length - 1; i >= 0; i--) {
         const p = exhaust[i];
-        p.x += p.vx * dt;
-        p.y += p.vy * dt;
-        p.vy += 25 * dt;
-        p.life -= dt * 1.1;
+        p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 15 * dt; p.life -= dt * 1.4;
         if (p.life <= 0) { exhaust.splice(i, 1); continue; }
-        if (p.hot) {
-          ctx.fillStyle = "rgba(255,250,235," + (p.life * 0.85) + ")";
-        } else {
-          ctx.fillStyle = "rgba(255," + Math.floor(110 + p.life * 110) + "," + Math.floor(20 + p.life * 50) + "," + (p.life * 0.7) + ")";
-        }
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.r * (0.3 + p.life * 0.7), 0, Math.PI * 2);
-        ctx.fill();
+        const la = p.life * (p.hot ? 0.9 : 0.65);
+        ctx.fillStyle = p.hot
+          ? "rgba(255,250,240," + la + ")"
+          : "rgba(255," + Math.floor(130 + p.life * 90) + "," + Math.floor(30 + p.life * 40) + "," + la + ")";
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r * (0.2 + p.life * 0.8), 0, Math.PI * 2); ctx.fill();
       }
 
-      if (rocketY > -100) {
-        const glowR = 35 + (phaseT < 0.6 ? phaseT * 50 : 30 + Math.random() * 12);
-        const glow = ctx.createRadialGradient(rsx, rsy + 38, 0, rsx, rsy + 38, glowR);
-        glow.addColorStop(0, "rgba(255,190,90,0.45)");
-        glow.addColorStop(0.5, "rgba(255,110,35,0.15)");
-        glow.addColorStop(1, "rgba(255,50,10,0)");
+      // engine glow (blooms at ignition)
+      if (phaseT >= ignitionT - 0.3 && rsy > -150) {
+        const bloom = phaseT < ignitionT
+          ? Math.pow((phaseT - (ignitionT - 0.3)) / 0.3, 2) * 0.3
+          : Math.min(1, (phaseT - ignitionT) / 0.4);
+        const gr = 20 + bloom * 50;
+        const glow = ctx.createRadialGradient(rsx, rsy + 42, 0, rsx, rsy + 42, gr);
+        glow.addColorStop(0, "rgba(255,200,100," + (bloom * 0.6) + ")");
+        glow.addColorStop(0.4, "rgba(255,120,40," + (bloom * 0.25) + ")");
+        glow.addColorStop(1, "rgba(255,60,15,0)");
         ctx.fillStyle = glow;
-        ctx.fillRect(rsx - glowR, rsy + 38 - glowR, glowR * 2, glowR * 2);
-
-        drawRocket3D(rsx, rsy, rocketRot, 24, 1);
+        ctx.fillRect(rsx - gr, rsy + 42 - gr, gr * 2, gr * 2);
       }
 
+      // speed lines (only during fast travel)
+      if (phaseT > liftT + 0.8) {
+        const si = Math.min(1, (phaseT - liftT - 0.8) / 1.5);
+        ctx.globalAlpha = si * 0.12;
+        for (let i = 0; i < 25; i++) {
+          const ang = hash(i * 137) * Math.PI * 2;
+          const d0 = 0.3 + hash(i * 71) * 0.7;
+          const ox = Math.cos(ang) * W * 0.6 * d0;
+          const oy = Math.sin(ang) * H * 0.6 * d0;
+          ctx.strokeStyle = "#b0caff";
+          ctx.lineWidth = 0.6;
+          ctx.beginPath();
+          ctx.moveTo(W/2 + ox, H/2 + oy);
+          ctx.lineTo(W/2 + ox * (1 - si * 0.5), H/2 + oy * (1 - si * 0.5));
+          ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+      }
+
+      if (rsy > -150) drawRocket(rsx, rsy, rRot, 26, 1);
       ctx.restore();
-      if (rocketY < -120) setPhase("warp");
+
+      if (rY < -160 && !fadeCallback) fadeTo("warp");
     }
 
     // ======== WARP ========
     function drawWarp(dt) {
-      const progress = Math.min(1, phaseT / 6);
-      const bgR = Math.floor(3 + progress * 20);
-      const bgG = Math.floor(3 + progress * 8);
-      const bgB = Math.floor(8 - progress * 3);
-      ctx.fillStyle = "rgb(" + bgR + "," + bgG + "," + bgB + ")";
+      const dur = 7;
+      const p = Math.min(1, phaseT / dur);
+      const cx = W / 2, cy = H / 2;
+
+      // sub-stages: drift (0-0.15), acceleration (0.15-0.4), tunnel (0.4-0.75), mars approach (0.75-1)
+      let speed;
+      if (p < 0.15) speed = 0.5 + p / 0.15 * 1.5;
+      else if (p < 0.4) speed = 2 + ((p - 0.15) / 0.25) * 4;
+      else speed = 6 + (p - 0.4) * 5;
+
+      // background darkens
+      const bg = Math.floor(3 + p * 15);
+      ctx.fillStyle = "rgb(" + bg + "," + Math.floor(bg * 0.7) + "," + Math.floor(bg * 1.2) + ")";
       ctx.fillRect(0, 0, W, H);
 
-      const cx = W / 2, cy = H / 2;
-      const speed = 2 + progress * 6.5;
-
+      // color journey: cool white → deep blue → violet → warm amber
       let cr, cg, cb;
-      if (progress < 0.25) {
-        cr = 220; cg = 235; cb = 255;
-      } else if (progress < 0.5) {
-        const t = (progress - 0.25) / 0.25;
-        cr = Math.floor(220 - t * 60); cg = Math.floor(235 - t * 80); cb = Math.floor(255 - t * 20);
-      } else if (progress < 0.75) {
-        const t = (progress - 0.5) / 0.25;
-        cr = Math.floor(160 + t * 70); cg = Math.floor(155 - t * 90); cb = Math.floor(235 - t * 160);
+      if (p < 0.2) {
+        cr = 210; cg = 225; cb = 255;
+      } else if (p < 0.45) {
+        const t = (p - 0.2) / 0.25;
+        cr = Math.floor(210 - t * 100); cg = Math.floor(225 - t * 110); cb = Math.floor(255 - t * 30);
+      } else if (p < 0.7) {
+        const t = (p - 0.45) / 0.25;
+        cr = Math.floor(110 + t * 90); cg = Math.floor(115 - t * 70); cb = Math.floor(225 - t * 100);
       } else {
-        const t = (progress - 0.75) / 0.25;
-        cr = Math.floor(230 - t * 30); cg = Math.floor(65 + t * 20); cb = Math.floor(75 - t * 50);
+        const t = (p - 0.7) / 0.3;
+        cr = Math.floor(200 + t * 30); cg = Math.floor(45 + t * 55); cb = Math.floor(125 - t * 100);
       }
 
-      for (const ring of tunnelRings) {
-        ring.z -= speed * dt;
-        ring.rot += dt * 0.15;
-        if (ring.z < 0.15) { ring.z += 50; ring.rot = Math.random() * Math.PI * 0.5; }
-        const s = 350 / (350 + ring.z * 55);
-        const rr = Math.min(W, H) * 0.85 * s;
-        if (rr < 3) continue;
-        const ra = Math.min(0.18, s * 0.18) * (1 - progress * 0.2);
-        ctx.strokeStyle = "rgba(" + cr + "," + cg + "," + cb + "," + ra + ")";
-        ctx.lineWidth = Math.max(0.5, s * 2.2);
-        ctx.beginPath();
-        for (let j = 0; j <= 6; j++) {
-          const a = ring.rot + (j / 6) * Math.PI * 2;
-          const px = cx + Math.cos(a) * rr;
-          const py = cy + Math.sin(a) * rr;
-          if (j === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      // tunnel rings only appear in tunnel phase
+      if (p > 0.35) {
+        const ringAlpha = Math.min(1, (p - 0.35) / 0.1);
+        for (const ring of rings) {
+          ring.z -= speed * dt;
+          ring.rot += dt * 0.12;
+          if (ring.z < 0.1) { ring.z += 48; ring.rot = Math.random() * Math.PI; }
+          const s = 350 / (350 + ring.z * 55);
+          const rr = Math.min(W, H) * 0.9 * s;
+          if (rr < 2) continue;
+          const ra = Math.min(0.15, s * 0.15) * ringAlpha * (1 - Math.max(0, p - 0.8) * 3);
+          ctx.strokeStyle = "rgba(" + cr + "," + cg + "," + cb + "," + ra + ")";
+          ctx.lineWidth = Math.max(0.4, s * 2);
+          ctx.beginPath();
+          for (let j = 0; j <= 6; j++) {
+            const a = ring.rot + (j / 6) * Math.PI * 2;
+            const px = cx + Math.cos(a) * rr, py = cy + Math.sin(a) * rr;
+            j === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+          }
+          ctx.stroke();
         }
-        ctx.stroke();
       }
 
-      for (const s of warpStars) {
+      // stars
+      for (const s of wStars) {
         s.z -= speed * dt;
-        if (s.z < 0.06) {
-          s.x = (Math.random() - 0.5) * 4;
-          s.y = (Math.random() - 0.5) * 4;
-          s.z = 4.5 + Math.random() * 1.5;
-        }
+        if (s.z < 0.05) { s.x = (Math.random()-0.5)*4; s.y = (Math.random()-0.5)*4; s.z = 5 + Math.random()*1.5; }
         const px = cx + (s.x / s.z) * W * 0.5;
         const py = cy + (s.y / s.z) * H * 0.5;
-        if (px < -20 || px > W + 20 || py < -20 || py > H + 20) continue;
-        const pxP = cx + (s.x / (s.z + speed * dt * 3)) * W * 0.5;
-        const pyP = cy + (s.y / (s.z + speed * dt * 3)) * H * 0.5;
-        const bright = Math.min(1, 0.6 / s.z);
-        const sLen = Math.hypot(px - pxP, py - pyP);
-        if (sLen > 1.5) {
-          const grad = ctx.createLinearGradient(pxP, pyP, px, py);
-          grad.addColorStop(0, "rgba(" + cr + "," + cg + "," + cb + ",0)");
-          grad.addColorStop(1, "rgba(" + cr + "," + cg + "," + cb + "," + bright + ")");
-          ctx.strokeStyle = grad;
-          ctx.lineWidth = Math.max(0.5, 2.5 / s.z);
-          ctx.beginPath();
-          ctx.moveTo(pxP, pyP);
-          ctx.lineTo(px, py);
-          ctx.stroke();
+        if (px < -30 || px > W + 30 || py < -30 || py > H + 30) continue;
+        const pxP = cx + (s.x / (s.z + speed * dt * 2.5)) * W * 0.5;
+        const pyP = cy + (s.y / (s.z + speed * dt * 2.5)) * H * 0.5;
+        const bright = Math.min(1, 0.5 / s.z);
+        const len = Math.hypot(px - pxP, py - pyP);
+        if (len > 1) {
+          ctx.strokeStyle = "rgba(" + cr + "," + cg + "," + cb + "," + bright + ")";
+          ctx.lineWidth = Math.max(0.4, 2 / s.z);
+          ctx.beginPath(); ctx.moveTo(pxP, pyP); ctx.lineTo(px, py); ctx.stroke();
         } else {
-          ctx.fillStyle = "rgba(" + cr + "," + cg + "," + cb + "," + (bright * 0.7) + ")";
+          ctx.fillStyle = "rgba(" + cr + "," + cg + "," + cb + "," + (bright * 0.6) + ")";
           ctx.fillRect(px - 0.5, py - 0.5, 1, 1);
         }
       }
 
-      if (progress > 0.15) {
-        for (let i = 0; i < 5; i++) {
-          const nx = cx + Math.sin(phaseT * 0.22 + i * 1.4) * W * 0.38;
-          const ny = cy + Math.cos(phaseT * 0.3 + i * 2.1) * H * 0.32;
-          const nr = 70 + progress * 160;
+      // nebula wisps
+      if (p > 0.2) {
+        for (let i = 0; i < 3; i++) {
+          const nx = cx + Math.sin(phaseT * 0.18 + i * 2.3) * W * 0.35;
+          const ny = cy + Math.cos(phaseT * 0.25 + i * 3.5) * H * 0.3;
+          const nr = 80 + p * 200;
           const nGrad = ctx.createRadialGradient(nx, ny, 0, nx, ny, nr);
-          const na = (progress - 0.15) * 0.035;
-          nGrad.addColorStop(0, "rgba(" + Math.floor(cr*0.8) + "," + Math.floor(cg*0.6+40) + ",70," + na + ")");
-          nGrad.addColorStop(1, "rgba(" + cr + "," + cg + ",70,0)");
+          const na = (p - 0.2) * 0.04;
+          nGrad.addColorStop(0, "rgba(" + Math.floor(cr*0.7) + "," + Math.floor(cg*0.5+30) + ",60," + na + ")");
+          nGrad.addColorStop(1, "rgba(" + cr + "," + cg + ",50,0)");
           ctx.fillStyle = nGrad;
           ctx.fillRect(0, 0, W, H);
         }
       }
 
-      const burstInterval = Math.max(0.6, 1.8 - progress * 1.2);
-      if (phaseT > 0.8 && Math.sin(phaseT * Math.PI / burstInterval) > 0.97) {
-        ctx.fillStyle = "rgba(" + cr + "," + cg + "," + cb + ",0.06)";
-        ctx.fillRect(0, 0, W, H);
-      }
+      // vignette
+      const vig = ctx.createRadialGradient(cx, cy, W * 0.1, cx, cy, W * 0.7);
+      vig.addColorStop(0, "rgba(0,0,0,0)");
+      vig.addColorStop(1, "rgba(0,0,0," + (0.35 + p * 0.2) + ")");
+      ctx.fillStyle = vig; ctx.fillRect(0, 0, W, H);
 
-      const vigGrad = ctx.createRadialGradient(cx, cy, W * 0.12, cx, cy, W * 0.65);
-      vigGrad.addColorStop(0, "rgba(0,0,0,0)");
-      vigGrad.addColorStop(1, "rgba(0,0,0,0.45)");
-      ctx.fillStyle = vigGrad;
-      ctx.fillRect(0, 0, W, H);
-
-      if (progress > 0.82) {
-        const mp = (progress - 0.82) / 0.18;
-        const mr = mp * Math.min(W, H) * 0.75;
-        const mGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, mr);
-        mGrad.addColorStop(0, "rgba(180,70,35," + (mp * 0.85) + ")");
-        mGrad.addColorStop(0.35, "rgba(150,55,28," + (mp * 0.65) + ")");
-        mGrad.addColorStop(0.7, "rgba(110,38,20," + (mp * 0.35) + ")");
-        mGrad.addColorStop(1, "rgba(60,20,10,0)");
+      // mars approach
+      if (p > 0.8) {
+        const mp = (p - 0.8) / 0.2;
+        const mr = mp * Math.min(W, H) * 0.8;
+        const mGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(1, mr));
+        mGrad.addColorStop(0, "rgba(170,65,30," + (mp * 0.9) + ")");
+        mGrad.addColorStop(0.3, "rgba(140,50,25," + (mp * 0.7) + ")");
+        mGrad.addColorStop(0.65, "rgba(100,35,18," + (mp * 0.4) + ")");
+        mGrad.addColorStop(1, "rgba(50,18,10,0)");
         ctx.fillStyle = mGrad;
-        ctx.beginPath();
-        ctx.arc(cx, cy, mr, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.beginPath(); ctx.arc(cx, cy, mr, 0, Math.PI * 2); ctx.fill();
       }
 
-      if (phaseT >= 6) setPhase("crash");
+      if (phaseT >= dur && !fadeCallback) fadeTo("crash");
     }
 
     // ======== CRASH ========
     function drawCrash(dt) {
-      if (phaseT < 0.1) crashFlash = 1;
-      crashFlash *= 0.85;
+      if (phaseT < 0.08) cFlash = 1;
+      cFlash *= 0.82;
 
-      const pr = Math.min(1, phaseT / 2.5);
-      ctx.fillStyle = "rgb(" + Math.floor(20 + pr * 20) + "," + Math.floor(10 + pr * 10) + "," + Math.floor(8 + pr * 7) + ")";
+      const dur = 3.0;
+      const pr = Math.min(1, phaseT / dur);
+
+      // sky transitions from dark to mars sky
+      const skyR = Math.floor(8 + pr * 32), skyG = Math.floor(5 + pr * 15), skyB = Math.floor(4 + pr * 10);
+      ctx.fillStyle = "rgb(" + skyR + "," + skyG + "," + skyB + ")";
       ctx.fillRect(0, 0, W, H);
 
-      if (phaseT > 0.3) {
-        for (let i = 0; i < 40; i++) {
-          const sx = ((i * 5801 + 7) % 1000) / 1000 * W;
-          const sy = ((i * 4217 + 11) % 1000) / 1000 * H * 0.5;
-          ctx.fillStyle = "rgba(232,230,223,0.25)";
-          ctx.fillRect(sx, sy, 1, 1);
+      // stars fade in
+      if (phaseT > 0.5) {
+        const sa = Math.min(1, (phaseT - 0.5) / 1.5);
+        for (let i = 0; i < 50; i++) {
+          ctx.fillStyle = "rgba(232,230,223," + (sa * (0.15 + hash(i+700) * 0.3)) + ")";
+          ctx.fillRect(hash(i+300)*W, hash(i+400)*H*0.5, 1, 1);
         }
       }
 
-      const tTop = H + 120 - pr * (H * 0.4 + 120);
-      const tGrad = ctx.createLinearGradient(0, tTop, 0, tTop + 80);
-      tGrad.addColorStop(0, "#8b4030");
-      tGrad.addColorStop(0.05, "#7b3525");
-      tGrad.addColorStop(1, "#5c2518");
-      ctx.fillStyle = tGrad;
-      ctx.fillRect(0, tTop, W, H - tTop + 200);
+      // terrain rushes up with jagged profile matching game terrain
+      const tTop = H + 100 - pr * (H * 0.4 + 100);
+      const crashTGrad = ctx.createLinearGradient(0, tTop - 20, 0, H);
+      crashTGrad.addColorStop(0, "#7b3525");
+      crashTGrad.addColorStop(0.1, "#6b3022");
+      crashTGrad.addColorStop(1, "#3a1510");
+      ctx.fillStyle = crashTGrad;
+      ctx.beginPath();
+      ctx.moveTo(0, tTop);
+      for (let x = 0; x <= W; x += 8) {
+        const jag = Math.sin(x * 0.03) * 12 + Math.sin(x * 0.08 + 2) * 6 + hash(Math.floor(x/8)) * 8;
+        ctx.lineTo(x, tTop + jag);
+      }
+      ctx.lineTo(W, H + 10); ctx.lineTo(0, H + 10); ctx.closePath(); ctx.fill();
 
-      if (phaseT < 0.7) {
-        const shk = (1 - phaseT / 0.7) * 14;
-        ctx.save();
-        ctx.translate((Math.random() - 0.5) * shk, (Math.random() - 0.5) * shk);
+      // terrain edge highlight
+      ctx.strokeStyle = "rgba(200,100,60,0.3)";
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(0, tTop);
+      for (let x = 0; x <= W; x += 8) {
+        const jag = Math.sin(x * 0.03) * 12 + Math.sin(x * 0.08 + 2) * 6 + hash(Math.floor(x/8)) * 8;
+        ctx.lineTo(x, tTop + jag);
+      }
+      ctx.stroke();
+
+      // camera shake
+      if (phaseT < 1.0) {
+        const shk = (1 - phaseT / 1.0) * 16;
+        ctx.save(); ctx.translate((Math.random()-0.5)*shk, (Math.random()-0.5)*shk);
       }
 
-      if (phaseT < 0.4 && crashDust.length < 120) {
-        for (let i = 0; i < 10; i++) {
-          const ang = Math.random() * Math.PI;
-          const spd = 120 + Math.random() * 300;
-          crashDust.push({
-            x: W / 2 + (Math.random() - 0.5) * 40,
-            y: tTop + Math.random() * 10,
-            vx: Math.cos(ang) * spd * (Math.random() > 0.5 ? 1 : -1),
+      // impact dust
+      if (phaseT < 0.6 && cDust.length < 200) {
+        for (let i = 0; i < 14; i++) {
+          const ang = Math.random() * Math.PI * 0.9 + Math.PI * 0.05;
+          const spd = 100 + Math.random() * 350;
+          cDust.push({
+            x: W/2 + (Math.random()-0.5)*60, y: tTop + hash(cDust.length)*15,
+            vx: Math.cos(ang) * spd * (Math.random()>0.5?1:-1),
             vy: -Math.sin(ang) * spd,
-            life: 1, r: 1.5 + Math.random() * 4,
+            life: 0.7 + Math.random()*0.6, r: 1 + Math.random()*5,
           });
         }
       }
-      for (let i = crashDust.length - 1; i >= 0; i--) {
-        const p = crashDust[i];
-        p.x += p.vx * dt;
-        p.y += p.vy * dt;
-        p.vy += 180 * dt;
-        p.life -= dt * 0.7;
-        if (p.life <= 0) { crashDust.splice(i, 1); continue; }
-        ctx.fillStyle = "rgba(170,105,75," + (p.life * 0.55) + ")";
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.r * (0.4 + p.life * 0.6), 0, Math.PI * 2);
-        ctx.fill();
+      for (let i = cDust.length - 1; i >= 0; i--) {
+        const d = cDust[i];
+        d.x += d.vx * dt; d.y += d.vy * dt; d.vy += 160 * dt; d.life -= dt * 0.6;
+        if (d.life <= 0) { cDust.splice(i, 1); continue; }
+        ctx.fillStyle = "rgba(160,95,65," + (d.life * 0.5) + ")";
+        ctx.beginPath(); ctx.arc(d.x, d.y, d.r * (0.3 + d.life * 0.7), 0, Math.PI * 2); ctx.fill();
       }
 
-      if (phaseT < 0.7) ctx.restore();
+      if (phaseT < 1.0) ctx.restore();
 
-      if (crashFlash > 0.01) {
-        ctx.fillStyle = "rgba(255,255,255," + crashFlash + ")";
+      if (cFlash > 0.01) {
+        ctx.fillStyle = "rgba(255,255,255," + cFlash + ")";
         ctx.fillRect(0, 0, W, H);
       }
 
-      if (phaseT >= 2.5) {
-        P.x = 80; P.y = terrY(P.x) - P.h; P.vy = 0; P.vx = 0; cam = 0;
-        setPhase("game");
+      if (phaseT >= dur && !fadeCallback) {
+        fadeCallback = () => {
+          P.x = 80; P.y = terrY(P.x) - P.h; P.vy = 0; P.vx = 0; cam = 0;
+          phase = "game"; phaseT = 0; fadeTarget = 0;
+        };
+        fadeTarget = 1;
       }
     }
 
@@ -1448,23 +1486,22 @@
     function drawGame(dt) {
       if (monHit) {
         monT += dt;
-        if (monT > 5) { setPhase("ending"); return; }
+        if (monT > 5.5) { setPhase("ending"); return; }
       }
 
       if (!monHit) {
-        const SPD = 220, JUMP = -380, GRAV = 650, FRIC = 0.85;
+        const SPD = 200, JUMP = -300, GRAV = 380, FRIC = 0.87;
         if (keys["ArrowLeft"] || keys["KeyA"]) { P.vx -= SPD * dt * 4; P.face = -1; }
         if (keys["ArrowRight"] || keys["KeyD"]) { P.vx += SPD * dt * 4; P.face = 1; }
         if ((keys["ArrowUp"] || keys["Space"] || keys["KeyW"]) && P.g) { P.vy = JUMP; P.g = false; }
         P.vy += GRAV * dt;
         P.vx *= Math.pow(FRIC, dt * 60);
         P.vx = Math.max(-SPD, Math.min(SPD, P.vx));
-        P.x += P.vx * dt;
-        P.y += P.vy * dt;
+        P.x += P.vx * dt; P.y += P.vy * dt;
         const ground = terrY(P.x) - P.h;
         if (P.y >= ground) { P.y = ground; P.vy = 0; P.g = true; } else { P.g = false; }
         if (P.y > H + 100) { P.x = Math.max(80, P.x - 200); P.y = terrY(P.x) - P.h - 50; P.vy = 0; }
-        P.x = Math.max(10, Math.min(WORLD_LEN - 10, P.x));
+        P.x = Math.max(10, Math.min(WL - 10, P.x));
 
         const monGy = terrY(MON_X);
         if (P.x + P.w/2 > MON_X - MON_W/2 && P.x - P.w/2 < MON_X + MON_W/2
@@ -1472,179 +1509,220 @@
           monHit = true; monT = 0;
         }
         if (P.g && Math.abs(P.vx) > 10) P.wt += dt * 8;
-
-        if (P.g && Math.abs(P.vx) > 30 && Math.random() < 0.4) {
+        if (P.g && Math.abs(P.vx) > 25 && Math.random() < 0.35) {
           pTrail.push({ x: P.x, y: P.y + P.h, life: 1, s: 1 + Math.random() * 1.5 });
         }
-        if (!P.g) {
-          if (Math.random() < 0.15) {
-            pTrail.push({ x: P.x + (Math.random()-0.5)*4, y: P.y + P.h*0.5, life: 0.6, s: 0.5+Math.random() });
-          }
+        if (!P.g && Math.random() < 0.12) {
+          pTrail.push({ x: P.x + (Math.random()-0.5)*4, y: P.y + P.h*0.5, life: 0.5, s: 0.4+Math.random()*0.8 });
         }
       }
 
-      const targetCam = P.x - W * 0.35;
-      cam += (targetCam - cam) * 0.08;
-      cam = Math.max(0, Math.min(WORLD_LEN - W, cam));
+      // camera with look-ahead
+      const lookAhead = P.vx * 0.35;
+      const targetCam = P.x + lookAhead - W * 0.38;
+      cam += (targetCam - cam) * 0.06;
+      cam = Math.max(0, Math.min(WL - W, cam));
 
-      const skyGrad = ctx.createLinearGradient(0, 0, 0, GROUND);
-      skyGrad.addColorStop(0, "#080504");
-      skyGrad.addColorStop(0.5, "#140c08");
-      skyGrad.addColorStop(0.85, "#22130d");
-      skyGrad.addColorStop(1, "#2e1812");
+      // sky gradient shifts as player progresses
+      const worldProgress = P.x / WL;
+      const skyGrad = ctx.createLinearGradient(0, 0, 0, GND);
+      if (worldProgress < 0.5) {
+        skyGrad.addColorStop(0, "#080504");
+        skyGrad.addColorStop(0.5, "#140c08");
+        skyGrad.addColorStop(0.85, "#22130d");
+        skyGrad.addColorStop(1, "#2e1812");
+      } else {
+        const t = (worldProgress - 0.5) * 2;
+        const r0 = Math.floor(8 + t * 10), g0 = Math.floor(5 + t * 4), b0 = Math.floor(4 + t * 8);
+        skyGrad.addColorStop(0, "rgb(" + r0 + "," + g0 + "," + b0 + ")");
+        skyGrad.addColorStop(0.5, "rgb(" + Math.floor(20+t*8) + "," + Math.floor(12+t*3) + "," + Math.floor(8+t*6) + ")");
+        skyGrad.addColorStop(1, "#2e1812");
+      }
       ctx.fillStyle = skyGrad;
       ctx.fillRect(0, 0, W, H);
 
-      const sp = cam * 0.08;
+      // distant horizon glow (monolith draws you forward)
+      if (worldProgress > 0.3) {
+        const glowI = Math.min(0.08, (worldProgress - 0.3) * 0.12);
+        const horizGlow = ctx.createRadialGradient(W * 0.85, GND, 0, W * 0.85, GND, H * 0.5);
+        horizGlow.addColorStop(0, "rgba(232,230,223," + glowI + ")");
+        horizGlow.addColorStop(1, "rgba(232,230,223,0)");
+        ctx.fillStyle = horizGlow;
+        ctx.fillRect(0, 0, W, H);
+      }
+
+      // sky stars
+      const sp = cam * 0.06;
       for (const s of skyStars) {
         const sx = s.x - sp;
         if (sx < -5 || sx > W + 5) continue;
-        const tw = 0.35 + 0.65 * Math.sin(s.tw + phaseT * 0.4);
-        ctx.fillStyle = "rgba(232,230,223," + (tw * 0.45) + ")";
-        ctx.beginPath();
-        ctx.arc(sx, s.y, s.r, 0, Math.PI * 2);
-        ctx.fill();
+        const tw = 0.3 + 0.7 * Math.sin(s.tw + phaseT * 0.35);
+        ctx.fillStyle = "rgba(232,230,223," + (tw * 0.4) + ")";
+        ctx.beginPath(); ctx.arc(sx, s.y, s.r, 0, Math.PI * 2); ctx.fill();
       }
 
-      const mColors = ["#0e0806", "#140c08", "#1a100c"];
-      const mParallax = [0.15, 0.25, 0.38];
-      for (let L = 0; L < 3; L++) {
-        ctx.fillStyle = mColors[L];
-        const mp = cam * mParallax[L];
-        for (const m of mtnLayers[L]) {
-          const mx = m.x - mp;
-          if (mx + m.w < -10 || mx > W + 10) continue;
-          ctx.beginPath();
-          ctx.moveTo(mx, GROUND);
-          ctx.lineTo(mx + m.w * 0.2, GROUND - m.h * 0.7);
-          ctx.lineTo(mx + m.w * 0.35, GROUND - m.h);
-          ctx.lineTo(mx + m.w * 0.55, GROUND - m.h * 0.8);
-          ctx.lineTo(mx + m.w * 0.72, GROUND - m.h * 0.92);
-          ctx.lineTo(mx + m.w, GROUND);
-          ctx.closePath();
-          ctx.fill();
-        }
+      // shooting stars
+      shootTimer -= dt;
+      if (shootTimer <= 0 && !monHit) {
+        shootTimer = 5 + Math.random() * 10;
+        shooters.push({
+          x: cam + Math.random() * W, y: Math.random() * GND * 0.3,
+          vx: 300 + Math.random() * 200, vy: 60 + Math.random() * 40,
+          life: 0.6 + Math.random() * 0.4,
+        });
       }
-
-      const hazeGrad = ctx.createLinearGradient(0, GROUND - 60, 0, GROUND + 20);
-      hazeGrad.addColorStop(0, "rgba(45,22,16,0)");
-      hazeGrad.addColorStop(1, "rgba(45,22,16,0.25)");
-      ctx.fillStyle = hazeGrad;
-      ctx.fillRect(0, GROUND - 60, W, 80);
-
-      const ti = Math.max(0, Math.floor(cam / TRES));
-      const te = Math.min(tLen - 1, Math.ceil((cam + W) / TRES));
-      const tGrad = ctx.createLinearGradient(0, GROUND - 50, 0, H);
-      tGrad.addColorStop(0, "#6b3022");
-      tGrad.addColorStop(0.15, "#5c2518");
-      tGrad.addColorStop(1, "#3a1510");
-      ctx.fillStyle = tGrad;
-      ctx.beginPath();
-      ctx.moveTo(ti * TRES - cam, terr[ti]);
-      for (let i = ti; i <= te; i++) ctx.lineTo(i * TRES - cam, terr[i]);
-      ctx.lineTo(te * TRES - cam, H + 10);
-      ctx.lineTo(ti * TRES - cam, H + 10);
-      ctx.closePath();
-      ctx.fill();
-
-      ctx.strokeStyle = "rgba(200,100,65,0.35)";
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.moveTo(ti * TRES - cam, terr[ti]);
-      for (let i = ti; i <= te; i++) ctx.lineTo(i * TRES - cam, terr[i]);
-      ctx.stroke();
-
-      ctx.strokeStyle = "rgba(120,55,35,0.15)";
-      ctx.lineWidth = 0.8;
-      for (let i = ti; i <= te; i += 3) {
-        const tx = i * TRES - cam;
-        const ty = terr[i];
+      for (let i = shooters.length - 1; i >= 0; i--) {
+        const s = shooters[i];
+        s.x += s.vx * dt; s.y += s.vy * dt; s.life -= dt * 1.2;
+        if (s.life <= 0) { shooters.splice(i, 1); continue; }
+        const sx = s.x - cam;
+        ctx.strokeStyle = "rgba(232,230,223," + (s.life * 0.5) + ")";
+        ctx.lineWidth = 0.8;
         ctx.beginPath();
-        ctx.moveTo(tx, ty);
-        ctx.lineTo(tx + (Math.random()-0.5)*6, ty + 8 + Math.random()*12);
+        ctx.moveTo(sx, s.y);
+        ctx.lineTo(sx - s.vx * 0.04, s.y - s.vy * 0.04);
         ctx.stroke();
       }
 
+      // mountains with atmospheric perspective
+      const mColors = [
+        [14, 8, 6, 0.5],
+        [20, 12, 8, 0.65],
+        [26, 16, 12, 0.8],
+      ];
+      const mPar = [0.1, 0.2, 0.35];
+      for (let L = 0; L < 3; L++) {
+        const [mr, mg, mb, ma] = mColors[L];
+        const mp = cam * mPar[L];
+        ctx.fillStyle = "rgba(" + mr + "," + mg + "," + mb + "," + ma + ")";
+        ctx.beginPath();
+        ctx.moveTo(-10, GND);
+        for (const pt of mtnLayers[L]) {
+          const sx = pt.x - mp;
+          if (sx > W + 100) break;
+          if (sx < -100) continue;
+          ctx.lineTo(sx, pt.y);
+        }
+        ctx.lineTo(W + 10, GND);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      // haze at horizon
+      const hazeGrad = ctx.createLinearGradient(0, GND - 50, 0, GND + 15);
+      hazeGrad.addColorStop(0, "rgba(40,20,14,0)");
+      hazeGrad.addColorStop(1, "rgba(40,20,14,0.2)");
+      ctx.fillStyle = hazeGrad;
+      ctx.fillRect(0, GND - 50, W, 65);
+
+      // terrain
+      const ti = Math.max(0, Math.floor(cam / TR));
+      const te = Math.min(tLen - 1, Math.ceil((cam + W) / TR));
+      const tGrad = ctx.createLinearGradient(0, GND - 40, 0, H);
+      tGrad.addColorStop(0, "#6b3022");
+      tGrad.addColorStop(0.12, "#5c2518");
+      tGrad.addColorStop(1, "#3a1510");
+      ctx.fillStyle = tGrad;
+      ctx.beginPath();
+      ctx.moveTo(ti * TR - cam, terr[ti]);
+      for (let i = ti; i <= te; i++) ctx.lineTo(i * TR - cam, terr[i]);
+      ctx.lineTo(te * TR - cam, H + 10);
+      ctx.lineTo(ti * TR - cam, H + 10);
+      ctx.closePath();
+      ctx.fill();
+
+      // terrain edge
+      ctx.strokeStyle = "rgba(200,100,65,0.3)";
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(ti * TR - cam, terr[ti]);
+      for (let i = ti; i <= te; i++) ctx.lineTo(i * TR - cam, terr[i]);
+      ctx.stroke();
+
+      // stable surface detail
+      ctx.strokeStyle = "rgba(100,48,30,0.12)";
+      ctx.lineWidth = 0.6;
+      for (let i = ti; i <= te; i += 4) {
+        const tx = i * TR - cam, ty = terr[i];
+        const s = hash(i) * 2 - 1;
+        ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(tx + s * 4, ty + 6 + hash(i + 999) * 10); ctx.stroke();
+      }
+
+      // rocks
+      ctx.fillStyle = "#2e1510";
+      for (const rock of rocks) {
+        const rx = rock.x - cam;
+        if (rx < -30 || rx > W + 30) continue;
+        const ry = terrY(rock.x);
+        ctx.beginPath();
+        for (let v = 0; v < rock.verts.length; v++) {
+          const vx = rx + rock.verts[v].x, vy = ry + rock.verts[v].y;
+          v === 0 ? ctx.moveTo(vx, vy) : ctx.lineTo(vx, vy);
+        }
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      // atmospheric dust
       for (const d of gameDust) {
         d.x += d.vx * dt;
-        if (d.x > cam + W + 50) d.x = cam - 50;
-        if (d.x < cam - 50) d.x = cam + W + 50;
-        ctx.fillStyle = "rgba(180,120,80," + d.a + ")";
+        if (d.x > cam + W + 60) d.x = cam - 60;
+        if (d.x < cam - 60) d.x = cam + W + 60;
+        ctx.fillStyle = "rgba(160,100,70," + d.a + ")";
         ctx.fillRect(d.x - cam, d.y, d.s, d.s);
       }
 
+      // player trail
       for (let i = pTrail.length - 1; i >= 0; i--) {
-        const p = pTrail[i];
-        p.life -= dt * 2;
-        if (p.life <= 0) { pTrail.splice(i, 1); continue; }
-        ctx.fillStyle = "rgba(160,100,70," + (p.life * 0.35) + ")";
-        ctx.fillRect(p.x - cam - p.s/2, p.y - p.s/2, p.s, p.s);
+        const t = pTrail[i];
+        t.life -= dt * 2;
+        if (t.life <= 0) { pTrail.splice(i, 1); continue; }
+        ctx.fillStyle = "rgba(140,85,60," + (t.life * 0.3) + ")";
+        ctx.fillRect(t.x - cam - t.s/2, t.y - t.s/2, t.s, t.s);
       }
 
-      if (!monHit) {
-        fAcc += dt;
-        if (fAcc >= fNext && P.x > 300) {
-          fAcc = 0;
-          fNext = 1.5 + Math.random() * 3;
-          frocks.push({
-            x: P.x + (Math.random()-0.3) * W * 0.6,
-            y: -20, vy: 80 + Math.random() * 60,
-            r: 2 + Math.random() * 3,
-            rot: Math.random() * Math.PI * 2,
-            rv: (Math.random()-0.5) * 4,
-          });
-        }
-      }
-      for (let i = frocks.length - 1; i >= 0; i--) {
-        const r = frocks[i];
-        r.y += r.vy * dt;
-        r.vy += 200 * dt;
-        r.rot += r.rv * dt;
-        if (r.y > terrY(r.x) + 20) { frocks.splice(i, 1); continue; }
-        ctx.save();
-        ctx.translate(r.x - cam, r.y);
-        ctx.rotate(r.rot);
-        ctx.fillStyle = "#3a1a10";
-        ctx.fillRect(-r.r, -r.r, r.r * 2, r.r * 2);
-        ctx.restore();
-      }
-
+      // monolith
       const monSx = MON_X - cam;
       const monGy = terrY(MON_X);
-      if (monSx > -60 && monSx < W + 60) {
-        const monGrad = ctx.createLinearGradient(monSx - MON_W/2, 0, monSx + MON_W/2, 0);
-        monGrad.addColorStop(0, "#0a0a0a");
-        monGrad.addColorStop(0.3, "#111");
-        monGrad.addColorStop(0.7, "#0d0d0d");
-        monGrad.addColorStop(1, "#080808");
+      if (monSx > -80 && monSx < W + 80) {
+        // monolith subtle pulse even before touch
+        const prePulse = Math.sin(phaseT * 0.8) * 0.015 + 0.015;
+        const monGrad = ctx.createLinearGradient(monSx - MON_W/2, monGy - MON_H, monSx + MON_W/2, monGy);
+        monGrad.addColorStop(0, "#080808");
+        monGrad.addColorStop(0.4, "#0e0e0e");
+        monGrad.addColorStop(0.6, "#0b0b0b");
+        monGrad.addColorStop(1, "#060606");
         ctx.fillStyle = monGrad;
         ctx.fillRect(monSx - MON_W/2, monGy - MON_H, MON_W, MON_H);
 
         if (!monHit) {
-          ctx.strokeStyle = "rgba(232,230,223,0.06)";
+          ctx.strokeStyle = "rgba(232,230,223," + (0.04 + prePulse) + ")";
           ctx.lineWidth = 0.5;
           ctx.strokeRect(monSx - MON_W/2, monGy - MON_H, MON_W, MON_H);
         }
 
         if (monHit) {
-          const ga = Math.min(1, monT * 0.4);
-          for (let g = 3; g > 0; g--) {
-            ctx.strokeStyle = "rgba(232,230,223," + (ga * 0.15 / g) + ")";
-            ctx.lineWidth = g * 4;
+          const ga = Math.min(1, monT * 0.35);
+          for (let g = 4; g > 0; g--) {
+            ctx.strokeStyle = "rgba(232,230,223," + (ga * 0.12 / g) + ")";
+            ctx.lineWidth = g * 5;
             ctx.strokeRect(monSx - MON_W/2, monGy - MON_H, MON_W, MON_H);
           }
-          ctx.strokeStyle = "rgba(232,230,223," + (ga * 0.7) + ")";
+          ctx.strokeStyle = "rgba(232,230,223," + (ga * 0.65) + ")";
           ctx.lineWidth = 1;
           ctx.strokeRect(monSx - MON_W/2, monGy - MON_H, MON_W, MON_H);
 
-          const beamA = Math.min(0.3, monT * 0.08);
-          const beamGrad = ctx.createLinearGradient(monSx, monGy - MON_H - 200, monSx, monGy - MON_H);
-          beamGrad.addColorStop(0, "rgba(232,230,223,0)");
-          beamGrad.addColorStop(1, "rgba(232,230,223," + beamA + ")");
-          ctx.fillStyle = beamGrad;
+          // light beam expanding upward
+          const beamA = Math.min(0.35, monT * 0.07);
+          const beamW = MON_W * (1 + monT * 0.3);
+          const beamH = 150 + monT * 60;
+          const beam = ctx.createLinearGradient(monSx, monGy - MON_H - beamH, monSx, monGy - MON_H);
+          beam.addColorStop(0, "rgba(232,230,223,0)");
+          beam.addColorStop(1, "rgba(232,230,223," + beamA + ")");
+          ctx.fillStyle = beam;
           ctx.beginPath();
-          ctx.moveTo(monSx - MON_W * 1.5, monGy - MON_H - 200);
-          ctx.lineTo(monSx + MON_W * 1.5, monGy - MON_H - 200);
+          ctx.moveTo(monSx - beamW, monGy - MON_H - beamH);
+          ctx.lineTo(monSx + beamW, monGy - MON_H - beamH);
           ctx.lineTo(monSx + MON_W/2, monGy - MON_H);
           ctx.lineTo(monSx - MON_W/2, monGy - MON_H);
           ctx.closePath();
@@ -1652,68 +1730,68 @@
         }
       }
 
+      // player astronaut
       const px = P.x - cam, py = P.y;
-      if (!monHit || monT < 3) {
-        const helmetGlow = ctx.createRadialGradient(px, py - 1, 0, px, py - 1, 12);
-        helmetGlow.addColorStop(0, "rgba(160,210,240,0.06)");
-        helmetGlow.addColorStop(1, "rgba(160,210,240,0)");
-        ctx.fillStyle = helmetGlow;
-        ctx.fillRect(px - 12, py - 13, 24, 24);
+      if (!monHit || monT < 3.5) {
+        const playerA = monHit ? Math.max(0, 1 - (monT - 2) / 1.5) : 1;
+        ctx.globalAlpha = playerA;
 
+        // helmet glow
+        const hg = ctx.createRadialGradient(px, py, 0, px, py, 14);
+        hg.addColorStop(0, "rgba(160,210,240,0.05)");
+        hg.addColorStop(1, "rgba(160,210,240,0)");
+        ctx.fillStyle = hg;
+        ctx.fillRect(px - 14, py - 14, 28, 28);
+
+        // helmet
         ctx.fillStyle = "#e8e6df";
-        ctx.beginPath();
-        ctx.arc(px, py - 1, P.w * 0.48, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = "rgba(100,180,220,0.45)";
-        ctx.beginPath();
-        ctx.arc(px + P.face * 1.8, py - 1.5, P.w * 0.28, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.beginPath(); ctx.arc(px, py - 1, P.w * 0.48, 0, Math.PI * 2); ctx.fill();
+        // visor
+        ctx.fillStyle = "rgba(80,160,210,0.4)";
+        ctx.beginPath(); ctx.arc(px + P.face * 1.8, py - 1.5, P.w * 0.27, 0, Math.PI * 2); ctx.fill();
 
+        // torso
         ctx.fillStyle = "#ddd8d0";
         const bx = px - P.w/2 - 0.5, by = py + 2;
-        ctx.fillRect(bx, by, P.w + 1, P.h * 0.55);
+        ctx.fillRect(bx, by, P.w + 1, P.h * 0.5);
+        // backpack
         ctx.fillStyle = "#c8c2b8";
-        ctx.fillRect(bx + P.w + 1, by + 2, 4, P.h * 0.35);
+        ctx.fillRect(bx + P.w + 1, by + 2, 3.5, P.h * 0.32);
 
+        // arms
         ctx.strokeStyle = "#ddd8d0";
+        ctx.lineWidth = 2.2;
+        const armY = py + P.h * 0.18;
+        const armSwing = P.g ? Math.sin(P.wt * 0.7) * 2.5 : 1;
+        ctx.beginPath(); ctx.moveTo(bx, armY); ctx.lineTo(bx - 4 - armSwing, armY + 5.5); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(bx + P.w + 1, armY); ctx.lineTo(bx + P.w + 5 + armSwing, armY + 5.5); ctx.stroke();
+
+        // legs
         ctx.lineWidth = 2.5;
-        const armY = py + P.h * 0.2;
-        ctx.beginPath();
-        ctx.moveTo(bx, armY);
-        ctx.lineTo(bx - 4 - (P.g ? Math.sin(P.wt * 0.7) * 2 : 1), armY + 6);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(bx + P.w + 1, armY);
-        ctx.lineTo(bx + P.w + 5 + (P.g ? Math.sin(P.wt * 0.7 + 1) * 2 : 1), armY + 6);
-        ctx.stroke();
+        const lo = P.g ? Math.sin(P.wt) * 5 : -3.5;
+        ctx.beginPath(); ctx.moveTo(px - 2.5, py + P.h * 0.52); ctx.lineTo(px - 3.5 + lo, py + P.h); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(px + 2.5, py + P.h * 0.52); ctx.lineTo(px + 3.5 - lo, py + P.h); ctx.stroke();
 
-        ctx.lineWidth = 2.8;
-        const lo = P.g ? Math.sin(P.wt) * 5 : -4;
-        ctx.beginPath();
-        ctx.moveTo(px - 2.5, py + P.h * 0.55 + 2);
-        ctx.lineTo(px - 3.5 + lo, py + P.h);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(px + 2.5, py + P.h * 0.55 + 2);
-        ctx.lineTo(px + 3.5 - lo, py + P.h);
-        ctx.stroke();
+        // boots
+        ctx.fillStyle = "#b0aa9e";
+        ctx.fillRect(px - 4.5 + lo, py + P.h - 2.5, 5, 2.5);
+        ctx.fillRect(px + 0.5 - lo, py + P.h - 2.5, 5, 2.5);
 
-        ctx.fillStyle = "#bbb5aa";
-        ctx.fillRect(px - 4 + lo, py + P.h - 3, 5, 3);
-        ctx.fillRect(px + 1 - lo, py + P.h - 3, 5, 3);
+        ctx.globalAlpha = 1;
       }
 
-      if (monHit && monT > 1.5) {
-        const fa = Math.min(0.9, (monT - 1.5) / 2.5);
+      // game fade-in
+      if (phaseT < 1.5 && !monHit) {
+        const fo = 1 - phaseT / 1.5;
+        ctx.fillStyle = "rgba(0,0,0," + fo + ")";
+        ctx.fillRect(0, 0, W, H);
+      }
+
+      // monolith ending sequence
+      if (monHit && monT > 2) {
+        const fa = Math.min(1, (monT - 2) / 3);
         ctx.fillStyle = "rgba(255,255,255," + fa + ")";
         ctx.fillRect(0, 0, W, H);
-        if (monT > 2.5) {
-          const ta = Math.min(1, (monT - 2.5) / 1);
-          ctx.fillStyle = "rgba(17,17,17," + ta + ")";
-          ctx.font = "italic " + Math.floor(Math.min(38, W * 0.04)) + "px 'Iowan Old Style', Georgia, serif";
-          ctx.textAlign = "center";
-          ctx.fillText("you made it", W / 2, H / 2);
-        }
       }
     }
 
@@ -1721,12 +1799,9 @@
     function drawEnding(dt) {
       ctx.fillStyle = "#fff";
       ctx.fillRect(0, 0, W, H);
-      const a = Math.min(1, phaseT / 1.5);
-      ctx.fillStyle = "rgba(17,17,17," + a + ")";
-      ctx.font = "italic " + Math.floor(Math.min(38, W * 0.04)) + "px 'Iowan Old Style', Georgia, serif";
-      ctx.textAlign = "center";
-      ctx.fillText("you made it", W / 2, H / 2);
-      if (phaseT > 3.5) clearWidget();
+
+      // just white. silence. then gently return home.
+      if (phaseT > 3) clearWidget();
     }
 
     function frame(now) {
@@ -1741,6 +1816,19 @@
       else if (phase === "crash") drawCrash(dt);
       else if (phase === "game") drawGame(dt);
       else if (phase === "ending") drawEnding(dt);
+
+      if (fadeTarget > 0) {
+        fadeAlpha += dt * 2.5;
+        if (fadeAlpha >= 1) { fadeAlpha = 1; if (fadeCallback) { fadeCallback(); fadeCallback = null; } }
+      } else if (fadeAlpha > 0) {
+        fadeAlpha -= dt * 2.5;
+        if (fadeAlpha < 0) fadeAlpha = 0;
+      }
+      if (fadeAlpha > 0) {
+        ctx.fillStyle = "rgba(0,0,0," + fadeAlpha + ")";
+        ctx.fillRect(0, 0, W, H);
+      }
+
       widgetRAF = requestAnimationFrame(frame);
     }
     widgetRAF = requestAnimationFrame(frame);
