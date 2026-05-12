@@ -1059,14 +1059,71 @@
     let rY = H * 0.65, rVel = 0, rRot = 0;
     const exhaust = [];
     const bgStars = [];
-    for (let i = 0; i < 3000; i++) bgStars.push({
-      x: hash(i + 17117) * W,
-      y: hash(i + 31547) * H,
-      r: 0.1 + Math.pow(hash(i + 48973), 3) * 1.3,
-      b: 0.08 + hash(i + 62131) * 0.85,
-      tw: hash(i + 79393) * 6.28,
-      twSpd: 0.1 + hash(i + 91807) * 2.0,
+    // layer 1: dense base field (6000 tiny stars everywhere)
+    for (let i = 0; i < 6000; i++) bgStars.push({
+      x: Math.random() * W, y: Math.random() * H,
+      r: 0.1 + Math.random() * 0.3,
+      b: 0.05 + Math.random() * 0.35,
+      tw: Math.random() * 6.28, twSpd: 0.1 + Math.random() * 1.5,
     });
+    // layer 2: milky way band (diagonal dense streak)
+    for (let i = 0; i < 3000; i++) {
+      const t = Math.random();
+      const bandX = t * W;
+      const bandY = (t * 0.6 + 0.2) * H + (Math.random() - 0.5) * H * 0.15;
+      bgStars.push({
+        x: bandX + (Math.random() - 0.5) * W * 0.08,
+        y: bandY,
+        r: 0.1 + Math.random() * 0.5,
+        b: 0.1 + Math.random() * 0.5,
+        tw: Math.random() * 6.28, twSpd: 0.2 + Math.random() * 1.2,
+      });
+    }
+    // layer 3: star clusters (8 clusters of 200 stars each)
+    for (let c = 0; c < 8; c++) {
+      const cx0 = Math.random() * W, cy0 = Math.random() * H;
+      const cR = 30 + Math.random() * 80;
+      for (let i = 0; i < 200; i++) {
+        const ang = Math.random() * 6.28;
+        const dist = Math.pow(Math.random(), 0.5) * cR;
+        bgStars.push({
+          x: cx0 + Math.cos(ang) * dist,
+          y: cy0 + Math.sin(ang) * dist,
+          r: 0.15 + Math.random() * 0.6,
+          b: 0.15 + Math.random() * 0.6,
+          tw: Math.random() * 6.28, twSpd: 0.3 + Math.random() * 1.8,
+        });
+      }
+    }
+    // layer 4: bright feature stars (200 larger, brighter)
+    for (let i = 0; i < 200; i++) bgStars.push({
+      x: Math.random() * W, y: Math.random() * H,
+      r: 0.5 + Math.random() * 1.5,
+      b: 0.5 + Math.random() * 0.5,
+      tw: Math.random() * 6.28, twSpd: 0.05 + Math.random() * 0.8,
+    });
+    // layer 5: geometric constellations (line patterns)
+    const constellations = [
+      [[0.1,0.2],[0.15,0.15],[0.22,0.18],[0.28,0.12],[0.33,0.16]],
+      [[0.6,0.7],[0.65,0.75],[0.7,0.72],[0.75,0.78],[0.72,0.83],[0.68,0.8]],
+      [[0.8,0.2],[0.85,0.25],[0.82,0.32],[0.87,0.35],[0.9,0.28]],
+      [[0.3,0.6],[0.35,0.55],[0.4,0.58],[0.42,0.52],[0.38,0.48],[0.33,0.5]],
+      [[0.5,0.1],[0.55,0.08],[0.58,0.13],[0.62,0.09],[0.65,0.14],[0.6,0.17]],
+      [[0.15,0.85],[0.2,0.82],[0.25,0.87],[0.3,0.84],[0.28,0.9]],
+      [[0.7,0.4],[0.75,0.35],[0.78,0.4],[0.82,0.37],[0.85,0.42],[0.8,0.45]],
+      [[0.4,0.3],[0.45,0.28],[0.5,0.32],[0.48,0.37],[0.43,0.35]],
+    ];
+    for (const pts of constellations) {
+      for (const [px, py] of pts) {
+        bgStars.push({
+          x: px * W + (Math.random() - 0.5) * 4,
+          y: py * H + (Math.random() - 0.5) * 4,
+          r: 0.8 + Math.random() * 1.0,
+          b: 0.6 + Math.random() * 0.35,
+          tw: Math.random() * 6.28, twSpd: 0.05 + Math.random() * 0.4,
+        });
+      }
+    }
 
     // ===== WARP STATE =====
     const wStars = [];
@@ -1126,10 +1183,28 @@
       ctx.fillStyle = "#020204";
       ctx.fillRect(0, 0, W, H);
 
-      // star field: gentle rotation of entire field + twinkle
+      // star field: gentle rotation + twinkle + color + glow + constellation lines
       const fieldRot = phaseT < 1.5 ? phaseT * 0.002 : 0.003 + (phaseT - 1.5) * 0.008;
       const cosR = Math.cos(phaseT * fieldRot), sinR = Math.sin(phaseT * fieldRot);
       const scx = W / 2, scy = H / 2;
+
+      // draw constellation lines first (behind stars)
+      ctx.save();
+      ctx.strokeStyle = "rgba(120,140,180,0.08)";
+      ctx.lineWidth = 0.5;
+      for (const pts of constellations) {
+        ctx.beginPath();
+        for (let ci = 0; ci < pts.length; ci++) {
+          const rx = pts[ci][0] * W, ry = pts[ci][1] * H;
+          const dx = rx - scx, dy = ry - scy;
+          const sx = scx + dx * cosR - dy * sinR;
+          const sy = scy + dx * sinR + dy * cosR;
+          ci === 0 ? ctx.moveTo(sx, sy) : ctx.lineTo(sx, sy);
+        }
+        ctx.stroke();
+      }
+      ctx.restore();
+
       for (const s of bgStars) {
         const dx = s.x - scx, dy = s.y - scy;
         const sx = scx + dx * cosR - dy * sinR;
@@ -1137,8 +1212,15 @@
         const twinkle = 0.4 + 0.6 * (0.5 + 0.5 * Math.sin(s.tw + phaseT * s.twSpd));
         const bright = s.b * twinkle;
         if (bright < 0.03) continue;
-        ctx.fillStyle = "rgba(225,223,218," + bright + ")";
+        // warm/cool color tint based on twinkle phase
+        const hue = s.tw < 2 ? "200,220,255" : s.tw < 4 ? "255,240,220" : "225,223,218";
+        ctx.fillStyle = "rgba(" + hue + "," + bright + ")";
         ctx.beginPath(); ctx.arc(sx, sy, s.r, 0, Math.PI * 2); ctx.fill();
+        // glow halo for brighter/larger stars
+        if (s.r > 0.6 && bright > 0.3) {
+          ctx.fillStyle = "rgba(" + hue + "," + (bright * 0.15) + ")";
+          ctx.beginPath(); ctx.arc(sx, sy, s.r * 3, 0, Math.PI * 2); ctx.fill();
+        }
       }
 
       const ignitionT = 2.0;
