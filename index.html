@@ -1485,8 +1485,12 @@
       P.vy *= Math.pow(0.91, dt * 60);
       P.x += P.vx * dt * 60;
       P.y += P.vy * dt * 60;
-      P.x = Math.max(-W * 0.35, Math.min(W * 0.35, P.x));
-      P.y = Math.max(-H * 0.3, Math.min(H * 0.3, P.y));
+      // soft elastic boundary (stronger pull-back the further out)
+      const bx = W * 0.35, by = H * 0.3;
+      if (Math.abs(P.x) > bx) P.vx -= Math.sign(P.x) * (Math.abs(P.x) - bx) * 0.02 * dt * 60;
+      if (Math.abs(P.y) > by) P.vy -= Math.sign(P.y) * (Math.abs(P.y) - by) * 0.02 * dt * 60;
+      P.x = Math.max(-bx * 1.3, Math.min(bx * 1.3, P.x));
+      P.y = Math.max(-by * 1.3, Math.min(by * 1.3, P.y));
 
       const targetTilt = P.vx * 15;
       P.tilt += (targetTilt - P.tilt) * dt * 5;
@@ -1680,11 +1684,11 @@
 
 
       // ending: white wash → homepage
-      if (progress > 0.93) {
-        const fa = Math.min(1, (progress - 0.93) / 0.07);
+      if (progress > 0.92) {
+        const fa = Math.min(1, (progress - 0.92) / 0.08);
         ctx.fillStyle = "rgba(255,255,255," + (fa * fa) + ")";
         ctx.fillRect(0, 0, W, H);
-        if (fa >= 1 && !ended) { ended = true; clearWidget(); }
+        if (fa > 0.98 && !ended) { ended = true; clearWidget(); }
       }
     }
 
