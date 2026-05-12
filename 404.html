@@ -682,10 +682,10 @@
         b.y += b.vy + Math.sin(b.wingPhase * 0.3) * 0.3;
         b.wingPhase += b.wingSpeed * 0.06;
 
-        if (birdsDying) b.alpha = Math.max(0, b.alpha - 0.08);
+        if (birdsDying) b.alpha = 0;
 
         if (b.alpha > 0.01) {
-          const wing = Math.sin(b.wingPhase) * (birdsDying ? 0.3 : 0.7);
+          const wing = Math.sin(b.wingPhase) * 0.7;
           const w = b.size;
           birdCtx.save();
           birdCtx.translate(b.x, b.y);
