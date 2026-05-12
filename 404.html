@@ -1651,99 +1651,46 @@
         ctx.beginPath(); ctx.arc(ex - earthR * 0.25, ey - earthR * 0.25, earthR * 0.45, 0, 6.28); ctx.fill();
       }
 
-      // --- ASTRONAUT (3rd person, backlit silhouette with rim light) ---
+      // --- ASTRONAUT (minimal capsule silhouette with rim light) ---
       const ax = cx + P.x;
-      const ay = cy + H * 0.2 + P.y;
-      const S = Math.min(W, H) * 0.028;
+      const ay = cy + H * 0.18 + P.y;
+      const S = Math.min(W, H) * 0.018;
 
       ctx.save();
       ctx.translate(ax, ay);
-      ctx.rotate(P.tilt * 0.015 + Math.sin(P.tumble) * 0.025);
+      ctx.rotate(P.tilt * 0.02 + Math.sin(P.tumble) * 0.03);
 
-      const breathe = Math.sin(phaseT * 1.2) * 0.02;
-      const armFloat = Math.sin(phaseT * 0.6) * 0.12;
-      const legFloat = Math.sin(phaseT * 0.4 + 1) * 0.08;
+      // outer glow (backlit)
+      const glow = ctx.createRadialGradient(0, 0, S * 0.5, 0, 0, S * 5);
+      glow.addColorStop(0, "rgba(100,140,200,0.05)");
+      glow.addColorStop(0.4, "rgba(70,100,160,0.02)");
+      glow.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = glow;
+      ctx.fillRect(-S * 5, -S * 5, S * 10, S * 10);
 
-      // rim-light glow (backlit by distant star)
-      const rimGlow = ctx.createRadialGradient(0, -S, S * 0.8, 0, -S * 0.5, S * 4);
-      rimGlow.addColorStop(0, "rgba(140,170,220,0.06)");
-      rimGlow.addColorStop(0.5, "rgba(80,110,170,0.02)");
-      rimGlow.addColorStop(1, "rgba(0,0,0,0)");
-      ctx.fillStyle = rimGlow;
-      ctx.fillRect(-S * 4, -S * 5, S * 8, S * 10);
-
-      // build silhouette path (all one continuous shape)
+      // capsule body (rounded pill shape)
       ctx.beginPath();
-
-      // helmet (rounded top)
-      ctx.arc(0, -S * 2.6, S * 0.85, -Math.PI * 0.85, -Math.PI * 0.15);
-
-      // right shoulder & arm
-      ctx.bezierCurveTo(S * 0.9, -S * 2.0, S * 0.75, -S * 1.4, S * 0.6, -S * 0.8);
-      // right arm floating outward
-      ctx.bezierCurveTo(S * 0.95, -S * 1.2 - armFloat * S, S * 1.3, -S * 1.8 - armFloat * S * 0.5, S * 1.2, -S * 2.2 - armFloat * S);
-
-      // right hand (small bump)
-      ctx.bezierCurveTo(S * 1.25, -S * 2.35 - armFloat * S, S * 1.15, -S * 2.4 - armFloat * S, S * 1.1, -S * 2.2 - armFloat * S);
-
-      // back to right torso
-      ctx.bezierCurveTo(S * 0.9, -S * 1.6 - armFloat * S * 0.3, S * 0.7, -S * 0.6, S * 0.55, S * 0.2);
-
-      // right hip to right leg
-      ctx.bezierCurveTo(S * 0.55, S * 0.8, S * 0.5 + legFloat * S * 0.3, S * 1.6, S * 0.45 + legFloat * S * 0.4, S * 2.6 + legFloat * S);
-
-      // right boot
-      ctx.bezierCurveTo(S * 0.5 + legFloat * S * 0.4, S * 2.9 + legFloat * S, S * 0.3 + legFloat * S * 0.3, S * 2.95 + legFloat * S, S * 0.2 + legFloat * S * 0.2, S * 2.8 + legFloat * S * 0.8);
-
-      // crotch
-      ctx.bezierCurveTo(S * 0.1, S * 2.0, -S * 0.1, S * 2.0, -S * 0.2 - legFloat * S * 0.15, S * 2.7 - legFloat * S * 0.3);
-
-      // left boot
-      ctx.bezierCurveTo(-S * 0.3 - legFloat * S * 0.2, S * 2.9 - legFloat * S * 0.3, -S * 0.5 - legFloat * S * 0.2, S * 2.85 - legFloat * S * 0.2, -S * 0.45 - legFloat * S * 0.3, S * 2.5 - legFloat * S * 0.5);
-
-      // left leg back up
-      ctx.bezierCurveTo(-S * 0.5 - legFloat * S * 0.2, S * 1.5, -S * 0.55, S * 0.8, -S * 0.55, S * 0.2);
-
-      // left torso to left arm
-      ctx.bezierCurveTo(-S * 0.7, -S * 0.6, -S * 0.85, -S * 1.5 + armFloat * S * 0.3, -S * 1.05, -S * 2.0 + armFloat * S * 0.6);
-
-      // left hand
-      ctx.bezierCurveTo(-S * 1.2, -S * 2.3 + armFloat * S * 0.5, -S * 1.25, -S * 2.4 + armFloat * S * 0.4, -S * 1.15, -S * 2.3 + armFloat * S * 0.5);
-
-      // left arm back to shoulder
-      ctx.bezierCurveTo(-S * 0.95, -S * 1.8 + armFloat * S * 0.2, -S * 0.8, -S * 1.4, -S * 0.7, -S * 1.8);
-
-      // left shoulder to helmet
-      ctx.bezierCurveTo(-S * 0.75, -S * 2.0, -S * 0.85, -S * 2.4, -S * 0.6, -S * 2.9);
-
-      ctx.closePath();
-
-      // fill silhouette
-      ctx.fillStyle = "rgba(8,8,12,0.92)";
+      ctx.ellipse(0, 0, S * 0.7, S * 1.6, 0, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(10,10,15,0.9)";
       ctx.fill();
 
-      // rim light edge (stroke the silhouette with thin bright line)
-      ctx.strokeStyle = "rgba(120,150,200,0.2)";
-      ctx.lineWidth = S * 0.06;
+      // rim light
+      ctx.strokeStyle = "rgba(130,160,210,0.25)";
+      ctx.lineWidth = S * 0.08;
       ctx.stroke();
 
-      // visor (golden reflection)
+      // helmet dome (top of capsule)
       ctx.beginPath();
-      ctx.ellipse(S * 0.05, -S * 2.6, S * 0.5, S * 0.42, 0.05, 0, Math.PI * 2);
-      ctx.fillStyle = "rgba(8,8,12,0.95)";
-      ctx.fill();
-      const visorGrad = ctx.createLinearGradient(-S * 0.4, -S * 2.9, S * 0.4, -S * 2.3);
-      visorGrad.addColorStop(0, "rgba(60,90,140,0.25)");
-      visorGrad.addColorStop(0.5, "rgba(100,140,190,0.15)");
-      visorGrad.addColorStop(1, "rgba(50,70,110,0.05)");
-      ctx.fillStyle = visorGrad;
+      ctx.arc(0, -S * 1.0, S * 0.55, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(12,12,18,0.95)";
       ctx.fill();
 
-      // backpack (subtle bump behind)
+      // visor (small arc of reflected light)
       ctx.beginPath();
-      ctx.ellipse(-S * 0.6 + breathe * S, -S * 1.2, S * 0.3, S * 0.8, -0.1, 0, Math.PI * 2);
-      ctx.fillStyle = "rgba(5,5,8,0.7)";
-      ctx.fill();
+      ctx.arc(0, -S * 1.0, S * 0.38, -0.8, 0.8);
+      ctx.strokeStyle = "rgba(80,120,180,0.3)";
+      ctx.lineWidth = S * 0.1;
+      ctx.stroke();
 
       ctx.restore();
 
@@ -1779,21 +1726,17 @@
         ctx.fillText("arrow keys to drift", cx, H - 35);
       }
 
-      // ending: white wash approaching Earth
-      if (progress > 0.92) {
-        const fa = Math.min(1, (progress - 0.92) / 0.08);
+      // ending: white wash → immediately reveals homepage
+      if (progress > 0.93) {
+        const fa = Math.min(1, (progress - 0.93) / 0.07);
         ctx.fillStyle = "rgba(255,255,255," + (fa * fa) + ")";
         ctx.fillRect(0, 0, W, H);
-        if (fa >= 1 && !ended) { ended = true; setPhase("ending"); }
+        if (fa >= 1 && !ended) { ended = true; clearWidget(); }
       }
     }
 
-    // ======== ENDING ========
-    function drawEnding(dt) {
-      ctx.fillStyle = "#fff";
-      ctx.fillRect(0, 0, W, H);
-      if (phaseT > 2.5) clearWidget();
-    }
+    // ======== ENDING (unused, clearWidget called directly) ========
+    function drawEnding(dt) { clearWidget(); }
 
     function frame(now) {
       if (activeWidget !== "play") return;
