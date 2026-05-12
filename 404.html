@@ -658,14 +658,14 @@
     function killBirds() {
       birdsDying = true;
       for (const b of birds) {
-        for (let i = 0; i < 12; i++) {
+        for (let i = 0; i < 20; i++) {
           b.dust.push({
-            x: b.x + (Math.random() - 0.5) * b.size,
-            y: b.y + (Math.random() - 0.5) * b.size * 0.5,
-            vx: (Math.random() - 0.5) * 1.5,
-            vy: 0.5 + Math.random() * 1.5,
-            r: 1 + Math.random() * 2,
-            alpha: 0.7 + Math.random() * 0.3,
+            x: b.x + (Math.random() - 0.5) * b.size * 1.5,
+            y: b.y + (Math.random() - 0.5) * b.size * 0.4,
+            vx: (Math.random() - 0.5) * 0.8,
+            vy: 0.3 + Math.random() * 0.8,
+            r: 0.4 + Math.random() * 0.8,
+            alpha: 0.4 + Math.random() * 0.3,
           });
         }
       }
@@ -682,17 +682,23 @@
           b.y += b.vy + Math.sin(b.wingPhase * 0.3) * 0.3;
           b.wingPhase += b.wingSpeed * 0.06;
 
-          // draw bird as simple V-shape wing strokes
-          const wing = Math.sin(b.wingPhase) * 0.6;
+          // bird: thin elegant arc — like a distant swallow
+          const wing = Math.sin(b.wingPhase) * 0.7;
+          const w = b.size;
           birdCtx.save();
           birdCtx.translate(b.x, b.y);
-          birdCtx.strokeStyle = "rgba(30,30,35," + b.alpha + ")";
-          birdCtx.lineWidth = 1.5;
+          birdCtx.strokeStyle = "rgba(25,25,30," + b.alpha + ")";
+          birdCtx.lineWidth = 1;
           birdCtx.lineCap = "round";
+          // left wing
           birdCtx.beginPath();
-          birdCtx.moveTo(-b.size, -wing * b.size * 0.5);
-          birdCtx.quadraticCurveTo(-b.size * 0.3, wing * b.size * 0.3, 0, 0);
-          birdCtx.quadraticCurveTo(b.size * 0.3, wing * b.size * 0.3, b.size, -wing * b.size * 0.5);
+          birdCtx.moveTo(0, 0);
+          birdCtx.quadraticCurveTo(-w * 0.4, -wing * w * 0.4, -w, -wing * w * 0.25);
+          birdCtx.stroke();
+          // right wing
+          birdCtx.beginPath();
+          birdCtx.moveTo(0, 0);
+          birdCtx.quadraticCurveTo(w * 0.4, -wing * w * 0.4, w, -wing * w * 0.25);
           birdCtx.stroke();
           birdCtx.restore();
           anyAlive = true;
@@ -700,18 +706,22 @@
 
         if (birdsDying) {
           b.alpha = Math.max(0, b.alpha - 0.06);
-          // draw fading bird
+          // fading bird
           if (b.alpha > 0.01) {
-            const wing = Math.sin(b.wingPhase) * 0.4;
+            const wing = Math.sin(b.wingPhase) * 0.3;
+            const w = b.size;
             birdCtx.save();
             birdCtx.translate(b.x, b.y);
-            birdCtx.strokeStyle = "rgba(30,30,35," + b.alpha + ")";
-            birdCtx.lineWidth = 1.5;
+            birdCtx.strokeStyle = "rgba(25,25,30," + b.alpha + ")";
+            birdCtx.lineWidth = 1;
             birdCtx.lineCap = "round";
             birdCtx.beginPath();
-            birdCtx.moveTo(-b.size, -wing * b.size * 0.5);
-            birdCtx.quadraticCurveTo(-b.size * 0.3, wing * b.size * 0.3, 0, 0);
-            birdCtx.quadraticCurveTo(b.size * 0.3, wing * b.size * 0.3, b.size, -wing * b.size * 0.5);
+            birdCtx.moveTo(0, 0);
+            birdCtx.quadraticCurveTo(-w * 0.4, -wing * w * 0.4, -w, -wing * w * 0.25);
+            birdCtx.stroke();
+            birdCtx.beginPath();
+            birdCtx.moveTo(0, 0);
+            birdCtx.quadraticCurveTo(w * 0.4, -wing * w * 0.4, w, -wing * w * 0.25);
             birdCtx.stroke();
             birdCtx.restore();
           }
@@ -724,7 +734,7 @@
             d.vx *= 0.98;
             d.alpha -= 0.015;
             if (d.alpha > 0) {
-              birdCtx.fillStyle = "rgba(50,45,40," + d.alpha + ")";
+              birdCtx.fillStyle = "rgba(120,115,110," + (d.alpha * 0.6) + ")";
               birdCtx.beginPath();
               birdCtx.arc(d.x, d.y, d.r, 0, 6.28);
               birdCtx.fill();
