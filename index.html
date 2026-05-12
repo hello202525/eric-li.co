@@ -572,7 +572,7 @@
       }
       return;
     }
-    if (k.length === 1 && /^[a-zA-Z0-9]$/.test(k)) {
+    if (k.length === 1 && /^[a-zA-Z0-9 .,!?'\-\/]$/.test(k)) {
       buf = (buf + k.toLowerCase()).slice(0, 18);
       $typer.textContent = buf;
       $typer.classList.add("show");
