@@ -614,6 +614,137 @@
       "#e8dcd0", "#d0dce0", "#e4ddd0", "#d8d8e0", "#e0e4d8",
     ];
     let lastTone = -1;
+
+    // birds system
+    let birdCanvas = null;
+    let birdCtx = null;
+    let birds = [];
+    let birdRAF = null;
+    let birdsAlive = false;
+    let birdsDying = false;
+
+    function spawnBirds() {
+      if (!birdCanvas) {
+        birdCanvas = document.createElement("canvas");
+        birdCanvas.style.cssText = "position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:999;";
+        document.body.appendChild(birdCanvas);
+        birdCtx = birdCanvas.getContext("2d");
+      }
+      birdCanvas.width = innerWidth;
+      birdCanvas.height = innerHeight;
+      birds = [];
+      birdsDying = false;
+      const count = 5 + Math.floor(Math.random() * 4);
+      const dir = Math.random() > 0.5 ? 1 : -1;
+      const baseY = innerHeight * (0.2 + Math.random() * 0.3);
+      for (let i = 0; i < count; i++) {
+        birds.push({
+          x: dir > 0 ? -40 - Math.random() * 120 : innerWidth + 40 + Math.random() * 120,
+          y: baseY + (Math.random() - 0.5) * 80 + Math.sin(i * 1.2) * 30,
+          vx: dir * (2.5 + Math.random() * 1.5),
+          vy: (Math.random() - 0.5) * 0.4,
+          size: 8 + Math.random() * 6,
+          wingPhase: Math.random() * 6.28,
+          wingSpeed: 4 + Math.random() * 2,
+          alpha: 1,
+          // dust particles (created on death)
+          dust: [],
+        });
+      }
+      birdsAlive = true;
+      if (!birdRAF) animateBirds();
+    }
+
+    function killBirds() {
+      birdsDying = true;
+      for (const b of birds) {
+        for (let i = 0; i < 12; i++) {
+          b.dust.push({
+            x: b.x + (Math.random() - 0.5) * b.size,
+            y: b.y + (Math.random() - 0.5) * b.size * 0.5,
+            vx: (Math.random() - 0.5) * 1.5,
+            vy: 0.5 + Math.random() * 1.5,
+            r: 1 + Math.random() * 2,
+            alpha: 0.7 + Math.random() * 0.3,
+          });
+        }
+      }
+    }
+
+    function animateBirds() {
+      if (!birdCanvas) return;
+      birdCtx.clearRect(0, 0, birdCanvas.width, birdCanvas.height);
+      let anyAlive = false;
+
+      for (const b of birds) {
+        if (!birdsDying && b.alpha > 0) {
+          b.x += b.vx;
+          b.y += b.vy + Math.sin(b.wingPhase * 0.3) * 0.3;
+          b.wingPhase += b.wingSpeed * 0.06;
+
+          // draw bird as simple V-shape wing strokes
+          const wing = Math.sin(b.wingPhase) * 0.6;
+          birdCtx.save();
+          birdCtx.translate(b.x, b.y);
+          birdCtx.strokeStyle = "rgba(30,30,35," + b.alpha + ")";
+          birdCtx.lineWidth = 1.5;
+          birdCtx.lineCap = "round";
+          birdCtx.beginPath();
+          birdCtx.moveTo(-b.size, -wing * b.size * 0.5);
+          birdCtx.quadraticCurveTo(-b.size * 0.3, wing * b.size * 0.3, 0, 0);
+          birdCtx.quadraticCurveTo(b.size * 0.3, wing * b.size * 0.3, b.size, -wing * b.size * 0.5);
+          birdCtx.stroke();
+          birdCtx.restore();
+          anyAlive = true;
+        }
+
+        if (birdsDying) {
+          b.alpha = Math.max(0, b.alpha - 0.06);
+          // draw fading bird
+          if (b.alpha > 0.01) {
+            const wing = Math.sin(b.wingPhase) * 0.4;
+            birdCtx.save();
+            birdCtx.translate(b.x, b.y);
+            birdCtx.strokeStyle = "rgba(30,30,35," + b.alpha + ")";
+            birdCtx.lineWidth = 1.5;
+            birdCtx.lineCap = "round";
+            birdCtx.beginPath();
+            birdCtx.moveTo(-b.size, -wing * b.size * 0.5);
+            birdCtx.quadraticCurveTo(-b.size * 0.3, wing * b.size * 0.3, 0, 0);
+            birdCtx.quadraticCurveTo(b.size * 0.3, wing * b.size * 0.3, b.size, -wing * b.size * 0.5);
+            birdCtx.stroke();
+            birdCtx.restore();
+          }
+          // dust particles
+          for (const d of b.dust) {
+            if (d.alpha <= 0) continue;
+            d.x += d.vx;
+            d.y += d.vy;
+            d.vy += 0.04;
+            d.vx *= 0.98;
+            d.alpha -= 0.015;
+            if (d.alpha > 0) {
+              birdCtx.fillStyle = "rgba(50,45,40," + d.alpha + ")";
+              birdCtx.beginPath();
+              birdCtx.arc(d.x, d.y, d.r, 0, 6.28);
+              birdCtx.fill();
+              anyAlive = true;
+            }
+          }
+          if (b.alpha > 0) anyAlive = true;
+        }
+      }
+
+      if (!birdsDying) anyAlive = true;
+      if (anyAlive) {
+        birdRAF = requestAnimationFrame(animateBirds);
+      } else {
+        birdRAF = null;
+        birdsAlive = false;
+        if (birdCanvas) { birdCanvas.remove(); birdCanvas = null; birdCtx = null; }
+      }
+    }
+
     $end.addEventListener("mouseenter", () => {
       if (activeWidget) return;
       let pick = lastTone;
@@ -628,6 +759,7 @@
         const r = (Math.random() - 0.5) * 16;
         s.style.transform = "translate(" + tx + "px," + ty + "px) rotate(" + r + "deg)";
       });
+      spawnBirds();
     });
     $end.addEventListener("mouseleave", () => {
       if (activeWidget) return;
@@ -635,6 +767,7 @@
       document.body.classList.remove("enchanted");
       if (bioEl) bioEl.classList.remove("enchanted");
       letters.forEach(s => { s.style.transform = ""; });
+      if (birdsAlive) killBirds();
     });
   }
 
