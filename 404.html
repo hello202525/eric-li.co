@@ -2045,7 +2045,7 @@ void main(){
   vec2 toCenter = v_uv - vec2(0.5);
   vec2 tangent = vec2(-toCenter.y, toCenter.x);
   float rDist = length(toCenter);
-  vel += tangent * 0.014 * smoothstep(0.0, 0.25, rDist);
+  vel += tangent * 0.035 * smoothstep(0.0, 0.2, rDist);
 
   // buoyancy + lateral wind
   vel.y += temp * 0.02;
@@ -2120,8 +2120,8 @@ void main(){
   float planetR = 0.34 * min(aspect, 1.0);
   float tendrilR = 0.47 * min(aspect, 1.0);
 
-  // rotate sampling UVs to give visual rotation
-  float rotAngle = u_time * 0.06;
+  // rotate sampling UVs to give visible rotation
+  float rotAngle = u_time * 0.4;
   vec2 rotUV = uv - vec2(0.5);
   rotUV = vec2(rotUV.x * cos(rotAngle) - rotUV.y * sin(rotAngle),
                rotUV.x * sin(rotAngle) + rotUV.y * cos(rotAngle));
