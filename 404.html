@@ -1236,31 +1236,35 @@
     warpTick(p) {
       if (!this._wDrone) return;
       const intensity = Math.min(1, p * 2);
-      this._wDrone.gain.gain.setTargetAtTime(intensity * 0.06, this.ctx.currentTime, 0.1);
-      this._wDrone.osc.frequency.setTargetAtTime(55 + p * 40, this.ctx.currentTime, 0.2);
-      this._wNoise.gain.gain.setTargetAtTime(intensity * 0.08, this.ctx.currentTime, 0.1);
-      this._wNoise.filter.frequency.setTargetAtTime(400 + p * 2000, this.ctx.currentTime, 0.2);
-      if (p > 0.75) {
-        const fade = 1 - (p - 0.75) / 0.25;
-        this._wDrone.gain.gain.setTargetAtTime(fade * 0.06, this.ctx.currentTime, 0.1);
-        this._wNoise.gain.gain.setTargetAtTime(fade * 0.08, this.ctx.currentTime, 0.1);
+      this._wDrone.gain.gain.setTargetAtTime(intensity * 0.06, this.ctx.currentTime, 0.15);
+      this._wDrone.osc.frequency.setTargetAtTime(55 + p * 40, this.ctx.currentTime, 0.3);
+      this._wNoise.gain.gain.setTargetAtTime(intensity * 0.08, this.ctx.currentTime, 0.15);
+      this._wNoise.filter.frequency.setTargetAtTime(400 + p * 2000, this.ctx.currentTime, 0.3);
+      // smooth deceleration feel as approaching Mars — no abrupt cut
+      if (p > 0.8) {
+        const fade = 1 - (p - 0.8) / 0.2;
+        this._wDrone.gain.gain.setTargetAtTime(fade * 0.06, this.ctx.currentTime, 0.4);
+        this._wDrone.osc.frequency.setTargetAtTime(55 + fade * 20, this.ctx.currentTime, 0.4);
+        this._wNoise.gain.gain.setTargetAtTime(fade * 0.04, this.ctx.currentTime, 0.4);
+        this._wNoise.filter.frequency.setTargetAtTime(200, this.ctx.currentTime, 0.4);
       }
     }
     crash() {
       this.stopAll();
-      const boom = this._noise(0.25);
-      boom.filter.frequency.value = 800;
-      boom.gain.gain.setTargetAtTime(0, this.ctx.currentTime + 0.15, 0.12);
-      const sub = this._osc("sine", 30, 0.3);
-      sub.gain.gain.setTargetAtTime(0.05, this.ctx.currentTime + 0.3, 0.2);
-      this._crashHum = this._osc("sawtooth", 38, 0.0);
-      const hf = this.ctx.createBiquadFilter();
-      hf.type = "lowpass"; hf.frequency.value = 100;
-      this._crashHum.osc.disconnect();
-      this._crashHum.osc.connect(hf); hf.connect(this._crashHum.gain);
-      setTimeout(() => {
-        if (this._crashHum) this._crashHum.gain.gain.setTargetAtTime(0.04, this.ctx.currentTime, 0.5);
-      }, 500);
+      const t = this.ctx.currentTime;
+      // continuous deep rumble (not a sharp boom)
+      const sub = this._osc("sine", 35, 0);
+      sub.gain.gain.setTargetAtTime(0.15, t, 0.3);
+      sub.gain.gain.setTargetAtTime(0.06, t + 1.0, 0.8);
+      // filtered noise bed — continuous, not fragmented
+      const bed = this._noise(0);
+      bed.filter.type = "lowpass";
+      bed.filter.frequency.value = 150;
+      bed.gain.gain.setTargetAtTime(0.06, t, 0.4);
+      bed.gain.gain.setTargetAtTime(0.03, t + 1.5, 1.0);
+      // warm resonant hum that builds
+      this._crashHum = this._osc("sine", 55, 0);
+      this._crashHum.gain.gain.setTargetAtTime(0.04, t + 0.5, 0.6);
     }
     drift() {
       this.stopAll();
@@ -1280,15 +1284,18 @@
     }
     chime() {
       const t = this.ctx.currentTime;
-      [523, 659, 784].forEach((f, i) => {
+      // soft pentatonic bell — lower frequencies, gentler envelope
+      [293.66, 369.99, 440].forEach((f, i) => {
         const o = this.ctx.createOscillator();
         const g = this.ctx.createGain();
-        o.type = "sine"; o.frequency.value = f;
-        g.gain.setValueAtTime(0, t + i * 0.12);
-        g.gain.linearRampToValueAtTime(0.06, t + i * 0.12 + 0.02);
-        g.gain.exponentialRampToValueAtTime(0.001, t + i * 0.12 + 1.5);
-        o.connect(g); g.connect(this.master); o.start(t + i * 0.12);
-        o.stop(t + i * 0.12 + 2);
+        const flt = this.ctx.createBiquadFilter();
+        flt.type = "lowpass"; flt.frequency.value = 1200;
+        o.type = "triangle"; o.frequency.value = f;
+        g.gain.setValueAtTime(0, t + i * 0.15);
+        g.gain.linearRampToValueAtTime(0.035, t + i * 0.15 + 0.06);
+        g.gain.exponentialRampToValueAtTime(0.001, t + i * 0.15 + 2.5);
+        o.connect(flt); flt.connect(g); g.connect(this.master);
+        o.start(t + i * 0.15); o.stop(t + i * 0.15 + 3);
       });
     }
     destroy() {
@@ -2005,44 +2012,71 @@ void main(){
   float s2 = fbm(vec3(v_uv.yx * 1.5, u_time * 0.06 + 10.0)) - 0.5;
   vel += vec2(s1, s2) * 0.015;
 
-  // central energy source (strong — keeps planet alive)
+  // central energy source (strong textured magma core)
   float cDist = length(v_uv - vec2(0.5));
-  float feed = exp(-cDist * cDist * 12.0) * 0.008;
+  float coreNoise = fbm(vec3(v_uv * 6.0, u_time * 0.08));
+  float feed = exp(-cDist * cDist * 10.0) * (0.008 + coreNoise * 0.004);
   density += feed;
-  temp += feed * 0.6;
+  temp += feed * 0.7;
 
-  // drifting secondary hotspots (multiple, aggressive)
-  vec2 src2 = vec2(0.5 + sin(u_time*0.13)*0.2, 0.5 + cos(u_time*0.17)*0.16);
+  // edge eruption sources — orbit near the planet boundary to create tendrils
+  vec2 src2 = vec2(0.5 + sin(u_time*0.13)*0.28, 0.5 + cos(u_time*0.17)*0.25);
   float d2 = length(v_uv - src2);
-  density += exp(-d2*d2 * 40.0) * 0.006;
-  temp += exp(-d2*d2 * 40.0) * 0.01;
+  density += exp(-d2*d2 * 30.0) * 0.008;
+  temp += exp(-d2*d2 * 30.0) * 0.014;
 
-  vec2 src3 = vec2(0.5 + cos(u_time*0.11)*0.24, 0.5 + sin(u_time*0.19)*0.2);
+  vec2 src3 = vec2(0.5 + cos(u_time*0.11)*0.30, 0.5 + sin(u_time*0.19)*0.26);
   float d3 = length(v_uv - src3);
-  density += exp(-d3*d3 * 40.0) * 0.005;
-  temp += exp(-d3*d3 * 40.0) * 0.008;
+  density += exp(-d3*d3 * 30.0) * 0.007;
+  temp += exp(-d3*d3 * 30.0) * 0.012;
 
-  vec2 src4 = vec2(0.5 + sin(u_time*0.23)*0.15, 0.5 + cos(u_time*0.29)*0.12);
+  vec2 src4 = vec2(0.5 + sin(u_time*0.23 + 2.0)*0.26, 0.5 + cos(u_time*0.29 + 1.5)*0.22);
   float d4 = length(v_uv - src4);
-  density += exp(-d4*d4 * 50.0) * 0.004;
-  temp += exp(-d4*d4 * 50.0) * 0.007;
+  density += exp(-d4*d4 * 35.0) * 0.006;
+  temp += exp(-d4*d4 * 35.0) * 0.011;
+
+  // fifth eruption for asymmetry
+  vec2 src5 = vec2(0.5 + cos(u_time*0.07)*0.32, 0.5 + sin(u_time*0.09)*0.28);
+  float d5 = length(v_uv - src5);
+  density += exp(-d5*d5 * 25.0) * 0.005;
+  temp += exp(-d5*d5 * 25.0) * 0.01;
+
+  // global rotation — fluid rotates as a body
+  vec2 toCenter = v_uv - vec2(0.5);
+  vec2 tangent = vec2(-toCenter.y, toCenter.x);
+  float rDist = length(toCenter);
+  vel += tangent * 0.014 * smoothstep(0.0, 0.25, rDist);
 
   // buoyancy + lateral wind
-  vel.y += temp * 0.025;
+  vel.y += temp * 0.02;
   vel.x += sin(v_uv.y * 6.28 + u_time * 0.3) * temp * 0.005;
 
   // decay
-  vel *= 0.992;
-  density *= 0.996;
-  temp *= 0.97;
+  vel *= 0.991;
+  density *= 0.995;
+  temp *= 0.965;
 
-  // circular planet boundary — hard kill outside planet radius
+  // soft boundary — tendrils can escape the sphere edge
   float fromCenter = length(v_uv - vec2(0.5));
-  float planetR = 0.35;
-  float boundFade = smoothstep(planetR, planetR * 0.5, fromCenter);
-  density *= mix(0.92, 1.0, boundFade);
-  temp *= mix(0.90, 1.0, boundFade);
-  vel *= mix(0.85, 1.0, boundFade);
+  float planetR = 0.34;
+  float tendrilR = 0.47;
+  float coreFade = smoothstep(planetR, planetR * 0.3, fromCenter);
+  density *= mix(0.88, 1.0, coreFade);
+  temp *= mix(0.88, 1.0, coreFade);
+  // outside core: gradual kill for tendrils
+  if (fromCenter > planetR) {
+    float outer = (fromCenter - planetR) / (tendrilR - planetR);
+    outer = clamp(outer, 0.0, 1.0);
+    density *= 1.0 - outer * 0.12;
+    temp *= 1.0 - outer * 0.15;
+    vel *= 1.0 - outer * 0.08;
+  }
+  // hard kill beyond tendril radius
+  if (fromCenter > tendrilR) {
+    density *= 0.7;
+    temp *= 0.6;
+    vel *= 0.5;
+  }
 
   fragColor = vec4(vel, max(density,0.0), max(temp,0.0));
 }`;
@@ -2083,38 +2117,58 @@ void main(){
   vec2 centered = uv - vec2(0.5);
   centered.x *= aspect;
   float dist = length(centered);
-  float planetR = 0.35 * min(aspect, 1.0);
+  float planetR = 0.34 * min(aspect, 1.0);
+  float tendrilR = 0.47 * min(aspect, 1.0);
 
-  // chromatic aberration toward edges
-  vec2 chromDir = normalize(centered + 0.0001) * 0.003 * smoothstep(planetR*0.5, planetR, dist);
-  vec4 stateR = texture(u_state, uv + chromDir);
-  vec4 stateG = texture(u_state, uv);
-  vec4 stateB = texture(u_state, uv - chromDir);
+  vec4 state = texture(u_state, uv);
 
-  float emR = stateR.z * 0.8 + stateR.w * 1.5 + length(stateR.xy) * 0.4;
-  float emG = stateG.z * 0.8 + stateG.w * 1.5 + length(stateG.xy) * 0.4;
-  float emB = stateB.z * 0.8 + stateB.w * 1.5 + length(stateB.xy) * 0.4;
+  // magma texture: multi-octave noise distorts the UV lookup
+  vec2 texUV = uv;
+  float n1 = vnoise(uv * 8.0 + u_time * 0.04);
+  float n2 = vnoise(uv * 16.0 - u_time * 0.03 + 3.7);
+  float n3 = vnoise(uv * 32.0 + u_time * 0.02 + 7.1);
+  texUV += vec2(n1 - 0.5, n2 - 0.5) * 0.015;
+  vec4 texState = texture(u_state, texUV);
 
-  float tR = clamp(stateR.w * 2.0 + length(stateR.xy) * 0.3, 0.0, 1.0);
-  float tG = clamp(stateG.w * 2.0 + length(stateG.xy) * 0.3, 0.0, 1.0);
-  float tB = clamp(stateB.w * 2.0 + length(stateB.xy) * 0.3, 0.0, 1.0);
+  // blend textured lookup with raw state inside planet
+  float inPlanet = smoothstep(planetR, planetR * 0.6, dist);
+  vec4 s = mix(state, texState, inPlanet * 0.5);
+
+  // chromatic aberration
+  vec2 chromDir = normalize(centered + 0.0001) * 0.004 * smoothstep(planetR*0.4, planetR, dist);
+  vec4 stR = texture(u_state, uv + chromDir);
+  vec4 stB = texture(u_state, uv - chromDir);
+
+  float emR = stR.z * 0.9 + stR.w * 1.8 + length(stR.xy) * 0.5;
+  float emG = s.z * 0.9 + s.w * 1.8 + length(s.xy) * 0.5;
+  float emB = stB.z * 0.9 + stB.w * 1.8 + length(stB.xy) * 0.5;
+
+  float tR = clamp(stR.w * 2.5 + length(stR.xy) * 0.3, 0.0, 1.0);
+  float tG = clamp(s.w * 2.5 + length(s.xy) * 0.3, 0.0, 1.0);
+  float tB = clamp(stB.w * 2.5 + length(stB.xy) * 0.3, 0.0, 1.0);
 
   vec3 col;
   col.r = marsColor(tR).r * emR;
   col.g = marsColor(tG).g * emG;
   col.b = marsColor(tB).b * emB;
 
-  // deep red in dense cool regions
-  float coolDense = stateG.z * (1.0 - clamp(stateG.w * 2.0, 0.0, 1.0));
-  col += vec3(0.25, 0.04, 0.01) * coolDense;
+  // dark cracks in cool dense regions (magma texture)
+  float coolDense = s.z * (1.0 - clamp(s.w * 2.0, 0.0, 1.0));
+  float crackNoise = vnoise(uv * 24.0 + u_time * 0.01) * vnoise(uv * 48.0 - u_time * 0.015);
+  col += vec3(0.3, 0.05, 0.01) * coolDense;
+  col *= 1.0 - crackNoise * 0.3 * inPlanet * (1.0 - tG);
+
+  // hot fissure lines
+  float fissure = smoothstep(0.48, 0.52, vnoise(uv * 12.0 + vec2(u_time * 0.02, -u_time * 0.015)));
+  col += vec3(1.0, 0.4, 0.05) * fissure * s.w * 0.4 * inPlanet;
 
   // bloom
   vec2 px = 1.0 / u_res;
   vec3 bloom = vec3(0.0);
-  for(int i = 1; i <= 6; i++){
+  for(int i = 1; i <= 8; i++){
     float fi = float(i);
-    float w = 1.0 / (fi * 1.2 + 1.0);
-    float off = fi * 2.5;
+    float w = 1.0 / (fi * 1.1 + 1.0);
+    float off = fi * 3.0;
     vec4 sR2 = texture(u_state, uv + vec2(off*px.x, 0));
     vec4 sL2 = texture(u_state, uv - vec2(off*px.x, 0));
     vec4 sU2 = texture(u_state, uv + vec2(0, off*px.y));
@@ -2124,40 +2178,43 @@ void main(){
     bloom += marsColor(clamp(sU2.w*3.0,0.0,1.0)) * (sU2.z+sU2.w) * w;
     bloom += marsColor(clamp(sD2.w*3.0,0.0,1.0)) * (sD2.z+sD2.w) * w;
   }
-  col += bloom * 0.08;
+  col += bloom * 0.1;
 
   // ACES tone mapping
   col = (col * (2.51 * col + 0.03)) / (col * (2.43 * col + 0.59) + 0.14);
   col = clamp(col, 0.0, 1.0);
 
-  // circular planet mask
-  float planetEdge = smoothstep(planetR, planetR - 0.008, dist);
+  // planet + tendril visibility mask
+  float planetEdge = smoothstep(planetR, planetR - 0.01, dist);
+  float tendrilEdge = smoothstep(tendrilR, planetR, dist);
 
-  // atmospheric rim glow
-  float rimGlow = smoothstep(planetR + 0.06, planetR - 0.02, dist) * (1.0 - smoothstep(planetR - 0.04, planetR - 0.12, dist));
-  vec3 rimCol = vec3(0.8, 0.25, 0.05) * rimGlow * 0.6;
+  // atmospheric rim glow (hot ring around planet)
+  float rimGlow = smoothstep(planetR + 0.04, planetR - 0.01, dist) * (1.0 - smoothstep(planetR - 0.03, planetR - 0.1, dist));
+  vec3 rimCol = vec3(0.9, 0.3, 0.05) * rimGlow * 0.8;
 
-  // outer atmospheric haze
-  float outerHaze = smoothstep(planetR + 0.12, planetR, dist) * (1.0 - planetEdge);
-  vec3 hazeCol = vec3(0.4, 0.1, 0.02) * outerHaze * 0.3;
+  // tendrils: visible plasma escaping the sphere
+  float tendrilVis = tendrilEdge * (1.0 - planetEdge);
+  vec3 tendrilCol = col * tendrilVis * 0.7;
 
-  // subtle surface noise for rocky texture
-  float surfNoise = vnoise(v_uv * 30.0 + u_time * 0.02) * 0.1;
-
-  vec3 planet = col * planetEdge + rimCol + hazeCol;
-  planet += vec3(surfNoise * 0.03, surfNoise * 0.01, 0.0) * planetEdge;
-
-  // spherical shading — lit from upper-left
+  // spherical shading
   vec2 normPos = centered / planetR;
-  float shade = clamp(dot(normalize(vec3(normPos, sqrt(max(0.0, 1.0 - dot(normPos, normPos))))), normalize(vec3(-0.4, 0.5, 0.7))), 0.0, 1.0);
-  shade = mix(0.3, 1.0, shade);
-  planet *= mix(1.0, shade, planetEdge * 0.4);
+  float normLen = dot(normPos, normPos);
+  float shade = 1.0;
+  if (normLen < 1.0) {
+    shade = clamp(dot(normalize(vec3(normPos, sqrt(1.0 - normLen))), normalize(vec3(-0.3, 0.4, 0.8))), 0.0, 1.0);
+    shade = mix(0.25, 1.0, shade);
+  }
+  vec3 planet = col * planetEdge * shade + rimCol + tendrilCol;
+
+  // surface noise texture to break up smoothness
+  float surfDetail = n3 * 0.08 * inPlanet;
+  planet += vec3(surfDetail * 0.5, surfDetail * 0.15, 0.0);
 
   // background: black with sparse stars
   float bgStar = step(0.998, hash(floor(v_uv * 300.0))) * (0.3 + 0.7 * hash(floor(v_uv * 300.0 + 100.0)));
-  vec3 bg = vec3(bgStar * 0.6);
+  vec3 bg = vec3(bgStar * 0.5);
 
-  vec3 final = mix(bg, planet, planetEdge + outerHaze + rimGlow * 0.5);
+  vec3 final = mix(bg, planet, max(planetEdge, tendrilEdge * 0.6) + rimGlow * 0.5);
 
   final *= u_fade;
   fragColor = vec4(final, 1.0);
@@ -2212,14 +2269,15 @@ void main(){
           const u = x / sW, v = y / sH;
           const cx2 = u - 0.5, cy2 = v - 0.5;
           const dd = Math.sqrt(cx2*cx2 + cy2*cy2);
-          const falloff = Math.exp(-dd * dd * 12);
+          const falloff = Math.exp(-dd * dd * 9);
           const n1 = Math.sin(u*17.3 + v*13.7) * Math.cos(u*23.1 - v*7.3);
           const n2 = Math.sin(u*31.1 + v*29.3 + 1.7) * Math.cos(u*11.3 + v*19.1);
           const n3 = Math.sin(u*43.7 - v*37.3 + 3.1) * Math.cos(u*53.1 + v*41.7);
-          const dens = (0.5 + 0.6 * Math.abs(n1 + n2 * 0.5 + n3 * 0.25)) * falloff;
-          const tmp = dens * 0.4 * falloff;
-          initData[idx] = (n2 * 0.15) * falloff;
-          initData[idx+1] = (n3 * 0.15) * falloff;
+          const dens = (0.6 + 0.7 * Math.abs(n1 + n2 * 0.5 + n3 * 0.25)) * falloff;
+          const tmp = dens * 0.5 * falloff;
+          const ang = Math.atan2(cy2, cx2);
+          initData[idx] = (n2 * 0.12 - Math.sin(ang) * 0.06) * falloff;
+          initData[idx+1] = (n3 * 0.12 + Math.cos(ang) * 0.06) * falloff;
           initData[idx+2] = dens;
           initData[idx+3] = tmp;
         }
@@ -2636,193 +2694,87 @@ void main(){
       }
     }
 
-    // ======== ENDING: Earth return ========
-    // Timeline (6s total):
-    //   0-1.5s: stars visible, Earth's blue atmosphere rises from bottom
-    //   1.5-3s: atmosphere brightens, sunrise warmth floods in, stars fade
-    //   3-4.5s: warm white, "Welcome home." types out
-    //   4.5-6s: settles to paper color (#f7f4ec), fade out to homepage
+    // ======== ENDING: Atmospheric return ========
+    // Minimal, tasteful: warm light crescendo → text on paper
+    // No crude planet rendering — just light and atmosphere
     let endingT = 0;
-    const endStars = [];
-    for (let i = 0; i < 120; i++) endStars.push({
-      x: Math.random() * W, y: Math.random() * H * 0.7,
-      r: 0.2 + Math.random() * 0.8, b: 0.3 + Math.random() * 0.7,
-    });
     const welcomeText = "Welcome home.";
     let welcomeRevealed = 0;
     let lastRevealT = 0;
+    const endStars = [];
+    for (let i = 0; i < 80; i++) endStars.push({
+      x: Math.random(), y: Math.random() * 0.8,
+      r: 0.3 + Math.random() * 0.7, b: 0.3 + Math.random() * 0.7,
+    });
 
     function drawEnding(dt) {
       endingT += dt;
       const t = endingT;
 
-      // phase 1: space → atmosphere (0-3s)
-      if (t < 3) {
-        const p = t / 3;
-        // background: black fading to deep blue
-        const bgR = Math.floor(p * 15);
-        const bgG = Math.floor(p * 25);
-        const bgB = Math.floor(4 + p * 55);
-        ctx.fillStyle = "rgb(" + bgR + "," + bgG + "," + bgB + ")";
+      // phase 1: space → warm light bloom (0-2.5s)
+      if (t < 2.5) {
+        const p = t / 2.5;
+        ctx.fillStyle = "#000";
         ctx.fillRect(0, 0, W, H);
 
-        // stars fade out as atmosphere comes in
-        const starA = Math.max(0, 1 - p * 1.2);
-        if (starA > 0.01) {
+        // fading stars
+        const starA = Math.max(0, 1 - p * 1.5);
+        if (starA > 0) {
           for (const s of endStars) {
-            ctx.fillStyle = "rgba(220,225,235," + (s.b * starA) + ")";
-            ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, 6.28); ctx.fill();
+            ctx.fillStyle = "rgba(200,210,225," + (s.b * starA) + ")";
+            ctx.beginPath(); ctx.arc(s.x * W, s.y * H, s.r, 0, 6.28); ctx.fill();
           }
         }
 
-        // Earth sphere: grows from pale blue dot to filling view
-        const earthCx = W * 0.5;
-        const earthCy = H * 0.75 - p * H * 0.2;
-        const earthR = 3 + Math.pow(p, 1.8) * Math.max(W, H) * 0.9;
-        const earthA = Math.min(1, p * 2);
-
-        // atmosphere halo (appears before the sphere is big)
-        if (earthR > 5) {
-          const haloR = earthR * 1.3;
-          const halo = ctx.createRadialGradient(earthCx, earthCy, earthR * 0.9, earthCx, earthCy, haloR);
-          halo.addColorStop(0, "rgba(100,160,255," + (earthA * 0.25) + ")");
-          halo.addColorStop(0.5, "rgba(60,120,200," + (earthA * 0.1) + ")");
-          halo.addColorStop(1, "rgba(40,80,160,0)");
-          ctx.fillStyle = halo;
-          ctx.beginPath(); ctx.arc(earthCx, earthCy, haloR, 0, 6.28); ctx.fill();
-        }
-
-        // planet body
-        ctx.save();
-        ctx.beginPath();
-        ctx.arc(earthCx, earthCy, earthR, 0, 6.28);
-        ctx.clip();
-
-        // base ocean gradient
-        const eGrad = ctx.createRadialGradient(earthCx - earthR * 0.3, earthCy - earthR * 0.3, 0, earthCx, earthCy, earthR);
-        eGrad.addColorStop(0, "rgba(80,140,210," + earthA + ")");
-        eGrad.addColorStop(0.4, "rgba(50,110,180," + earthA + ")");
-        eGrad.addColorStop(0.7, "rgba(30,80,150," + earthA + ")");
-        eGrad.addColorStop(1, "rgba(15,40,90," + earthA + ")");
-        ctx.fillStyle = eGrad;
-        ctx.fillRect(earthCx - earthR, earthCy - earthR, earthR * 2, earthR * 2);
-
-        // continental masses (abstract green-brown shapes via overlapping arcs)
-        if (earthR > 30) {
-          const cA = earthA * 0.4;
-          const rot = t * 0.05;
-          ctx.fillStyle = "rgba(60,100,50," + cA + ")";
-          ctx.beginPath();
-          ctx.ellipse(earthCx + Math.cos(rot) * earthR * 0.2, earthCy - earthR * 0.15,
-            earthR * 0.3, earthR * 0.25, rot * 0.5, 0, 6.28);
-          ctx.fill();
-          ctx.fillStyle = "rgba(70,110,55," + (cA * 0.8) + ")";
-          ctx.beginPath();
-          ctx.ellipse(earthCx - Math.cos(rot + 1) * earthR * 0.25, earthCy + earthR * 0.2,
-            earthR * 0.25, earthR * 0.15, -rot * 0.3, 0, 6.28);
-          ctx.fill();
-          ctx.fillStyle = "rgba(55,90,45," + (cA * 0.6) + ")";
-          ctx.beginPath();
-          ctx.ellipse(earthCx + earthR * 0.15, earthCy + earthR * 0.35,
-            earthR * 0.2, earthR * 0.12, rot * 0.7, 0, 6.28);
-          ctx.fill();
-        }
-
-        // cloud wisps (white semi-transparent arcs that rotate)
-        if (earthR > 50) {
-          const cloudA = earthA * 0.3;
-          const cr1 = t * 0.03;
-          ctx.strokeStyle = "rgba(255,255,255," + cloudA + ")";
-          ctx.lineWidth = earthR * 0.03;
-          ctx.lineCap = "round";
-          for (let ci = 0; ci < 5; ci++) {
-            const ca = cr1 + ci * 1.2;
-            const cd = earthR * (0.3 + ci * 0.12);
-            ctx.beginPath();
-            ctx.arc(earthCx + Math.cos(ca) * cd * 0.3, earthCy + Math.sin(ca) * cd * 0.2,
-              cd, ca, ca + 0.8 + ci * 0.2);
-            ctx.stroke();
-          }
-        }
-
-        // spherical shading (lit from upper-left)
-        const shade = ctx.createRadialGradient(
-          earthCx - earthR * 0.35, earthCy - earthR * 0.35, 0,
-          earthCx, earthCy, earthR
-        );
-        shade.addColorStop(0, "rgba(255,255,255,0.08)");
-        shade.addColorStop(0.4, "rgba(0,0,0,0)");
-        shade.addColorStop(0.8, "rgba(0,0,20,0.3)");
-        shade.addColorStop(1, "rgba(0,0,10,0.5)");
-        ctx.fillStyle = shade;
-        ctx.fillRect(earthCx - earthR, earthCy - earthR, earthR * 2, earthR * 2);
-
-        ctx.restore();
-
-        // sunrise warmth as you enter atmosphere (~2s)
-        if (p > 0.6) {
-          const sunP = (p - 0.6) / 0.4;
-          const sunR = earthR * 0.6 + sunP * 200;
-          const sunG = ctx.createRadialGradient(earthCx, earthCy - earthR * 0.5, 0, earthCx, earthCy, sunR);
-          sunG.addColorStop(0, "rgba(255,220,160," + (sunP * 0.3) + ")");
-          sunG.addColorStop(0.5, "rgba(255,180,100," + (sunP * 0.15) + ")");
-          sunG.addColorStop(1, "rgba(255,140,60,0)");
-          ctx.fillStyle = sunG;
+        // growing warm light from center — like re-entering atmosphere
+        const glowR = p * p * Math.max(W, H) * 0.8;
+        if (glowR > 1) {
+          const glow = ctx.createRadialGradient(W / 2, H * 0.55, 0, W / 2, H * 0.55, glowR);
+          glow.addColorStop(0, "rgba(250,245,235," + (p * p * 0.9) + ")");
+          glow.addColorStop(0.3, "rgba(245,235,215," + (p * p * 0.6) + ")");
+          glow.addColorStop(0.6, "rgba(220,200,170," + (p * p * 0.3) + ")");
+          glow.addColorStop(1, "rgba(180,160,130,0)");
+          ctx.fillStyle = glow;
           ctx.fillRect(0, 0, W, H);
         }
       }
-      // phase 2: atmosphere → warm white (3-4.5s)
-      else if (t < 4.5) {
-        const p = (t - 3) / 1.5;
-        // blend from blue atmosphere to warm white
-        const r = Math.floor(40 + p * 215);
-        const g = Math.floor(60 + p * 190);
-        const b = Math.floor(100 + p * 148);
-        ctx.fillStyle = "rgb(" + Math.min(255, r) + "," + Math.min(250, g) + "," + Math.min(248, b) + ")";
-        ctx.fillRect(0, 0, W, H);
-
-        // lingering sunrise warmth at bottom
-        const warmA = (1 - p) * 0.2;
-        if (warmA > 0.01) {
-          const wG = ctx.createLinearGradient(0, H * 0.5, 0, H);
-          wG.addColorStop(0, "rgba(255,220,180,0)");
-          wG.addColorStop(1, "rgba(255,200,140," + warmA + ")");
-          ctx.fillStyle = wG;
-          ctx.fillRect(0, 0, W, H);
-        }
-      }
-      // phase 3: warm white → paper (4.5-6s)
-      else {
-        const p = Math.min(1, (t - 4.5) / 1.5);
-        // from warm white to exact paper color
-        const r = Math.floor(255 - p * 8);
-        const g = Math.floor(250 - p * 6);
-        const b = Math.floor(248 - p * 12);
+      // phase 2: light → paper color (2.5-4s)
+      else if (t < 4) {
+        const p = (t - 2.5) / 1.5;
+        // warm cream settling to paper
+        const r = Math.floor(250 - p * 3);
+        const g = Math.floor(245 - p * 1);
+        const b = Math.floor(235 + p * 1);
         ctx.fillStyle = "rgb(" + r + "," + g + "," + b + ")";
         ctx.fillRect(0, 0, W, H);
       }
+      // phase 3: hold on paper (4-5.5s)
+      else {
+        ctx.fillStyle = "#f7f4ec";
+        ctx.fillRect(0, 0, W, H);
+      }
 
-      // typewriter text (starts at 3.2s, during the warm white phase)
-      if (t > 3.2 && welcomeRevealed < welcomeText.length) {
-        if (t - lastRevealT > 0.08) {
+      // typewriter text (starts at 2.8s)
+      if (t > 2.8 && welcomeRevealed < welcomeText.length) {
+        if (t - lastRevealT > 0.09) {
           welcomeRevealed++;
           lastRevealT = t;
         }
       }
 
-      // text visibility: fade in at 3.2, hold, fade out at 5.2
-      const textFade = t < 3.2 ? 0 : t < 3.5 ? (t - 3.2) / 0.3 : t < 5.2 ? 1 : Math.max(0, 1 - (t - 5.2) / 0.6);
+      // text: fade in at 2.8, hold, fade out at 4.8
+      const textFade = t < 2.8 ? 0 : t < 3.1 ? (t - 2.8) / 0.3 : t < 4.8 ? 1 : Math.max(0, 1 - (t - 4.8) / 0.5);
       if (welcomeRevealed > 0 && textFade > 0.01) {
         ctx.save();
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.font = "300 22px 'EB Garamond', serif";
-        ctx.fillStyle = "rgba(40,36,30," + textFade + ")";
+        ctx.font = "italic 300 22px 'Iowan Old Style', Georgia, 'Palatino Linotype', Palatino, serif";
+        ctx.fillStyle = "rgba(60,54,44," + (textFade * 0.8) + ")";
         ctx.fillText(welcomeText.slice(0, welcomeRevealed), W / 2, H / 2);
         ctx.restore();
       }
 
-      if (t > 6.0) clearWidget();
+      if (t > 5.5) clearWidget();
     }
 
     function frame(now) {
