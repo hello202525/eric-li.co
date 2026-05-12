@@ -2173,17 +2173,33 @@ void main(){
       }
 
 
-      // ending: white wash → homepage
+      // ending: white wash → "Welcome home." → homepage
       if (progress > 0.92) {
         const fa = Math.min(1, (progress - 0.92) / 0.08);
         ctx.fillStyle = "rgba(255,255,255," + (fa * fa) + ")";
         ctx.fillRect(0, 0, W, H);
-        if (fa > 0.98 && !ended) { ended = true; clearWidget(); }
+        if (fa > 0.98 && !ended) { ended = true; fadeTo("ending"); }
       }
     }
 
-    // ======== ENDING (unused, clearWidget called directly) ========
-    function drawEnding(dt) { clearWidget(); }
+    let endingT = 0;
+    function drawEnding(dt) {
+      endingT += dt;
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, 0, W, H);
+      const textFade = endingT < 0.5 ? endingT / 0.5 : endingT < 2.5 ? 1 : Math.max(0, 1 - (endingT - 2.5) / 0.8);
+      if (textFade > 0.01) {
+        ctx.save();
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.font = "300 clamp(16px, 2.2vw, 22px) 'EB Garamond', serif";
+        ctx.font = "300 22px 'EB Garamond', serif";
+        ctx.fillStyle = "rgba(40,36,30," + textFade + ")";
+        ctx.fillText("Welcome home.", W / 2, H / 2);
+        ctx.restore();
+      }
+      if (endingT > 3.3) clearWidget();
+    }
 
     function frame(now) {
       if (activeWidget !== "play") return;
