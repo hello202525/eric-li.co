@@ -1062,62 +1062,56 @@
 
     // ===== WARP STATE =====
     const wStars = [];
-    for (let i = 0; i < 400; i++) wStars.push({
-      x: (Math.random()-0.5)*4, y: (Math.random()-0.5)*4,
-      z: 0.2 + Math.random()*6,
-      sz: 0.3 + Math.pow(Math.random(), 3) * 3,
+    for (let i = 0; i < 1200; i++) wStars.push({
+      a: Math.random() * Math.PI * 2,
+      d: 0.05 + Math.pow(Math.random(), 0.7) * 1.2,
+      z: Math.random(),
+      spd: 0.6 + Math.random() * 0.6,
+      w: 0.4 + Math.pow(Math.random(), 2) * 3.5,
       hue: Math.random(),
     });
-    const pulseRings = [];
-    let nextPulse = 1.8;
 
     // ===== CRASH STATE =====
     const cDust = [];
     let cFlash = 0;
 
-    // ===== DRIFT WORLD (zero-g) =====
-    const DRIFT_DUR = 30;
-    const cx = W / 2, cy = H / 2;
+    // ===== DRIFT WORLD (3rd person astronaut) =====
+    const DRIFT_DUR = 35;
+    const dCx = W / 2, dCy = H / 2;
 
     const farStars = [];
-    for (let i = 0; i < 320; i++) farStars.push({
-      x: (hash(i * 31) - 0.5) * 3, y: (hash(i * 59) - 0.5) * 3,
-      z: 0.5 + hash(i * 97) * 8,
-      r: 0.2 + hash(i * 13) * 0.7,
+    for (let i = 0; i < 500; i++) farStars.push({
+      x: (hash(i * 31) - 0.5) * 6, y: (hash(i * 59) - 0.5) * 5,
+      z: 0.5 + hash(i * 97) * 12,
+      r: 0.15 + hash(i * 13) * 0.6,
       tw: hash(i * 41) * 6.28,
+      bright: 0.2 + hash(i * 77) * 0.8,
     });
 
-    const debris = [];
-    for (let i = 0; i < 100; i++) {
-      const zone = hash(i * 73);
-      const sz = 0.5 + hash(i * 29) * (zone < 0.3 ? 4 : zone < 0.6 ? 6 : 2);
-      const warm = hash(i * 41);
-      debris.push({
-        x: (hash(i * 53) - 0.5) * 5,
-        y: (hash(i * 67) - 0.5) * 4,
-        z: 1.5 + hash(i * 83) * 45,
-        sz, zone, warm,
+    const spaceDebris = [];
+    for (let i = 0; i < 80; i++) {
+      spaceDebris.push({
+        x: (hash(i * 53) - 0.5) * 8,
+        y: (hash(i * 67) - 0.5) * 6,
+        z: 2 + hash(i * 83) * 50,
+        sz: 0.3 + hash(i * 29) * 2.5,
+        warm: hash(i * 41),
+        rotSpd: (hash(i * 19) - 0.5) * 2,
       });
     }
 
-    const closePasses = [
-      { z: 8, x: 0.7, y: -0.2, sz: 60 },
-      { z: 20, x: -0.5, y: 0.4, sz: 80 },
-      { z: 34, x: 0.3, y: -0.5, sz: 55 },
-      { z: 44, x: -0.8, y: 0.15, sz: 70 },
-    ];
-
-    const bokeh = [];
-    for (let i = 0; i < 50; i++) bokeh.push({
-      x: (Math.random() - 0.5) * 2,
-      y: (Math.random() - 0.5) * 2,
-      z: 0.3 + Math.random() * 3,
-      r: 3 + Math.random() * 12,
-      a: 0.01 + Math.random() * 0.03,
-      spd: 0.05 + Math.random() * 0.2,
+    const nebulae = [];
+    for (let i = 0; i < 6; i++) nebulae.push({
+      x: (hash(i * 137) - 0.5) * 4,
+      y: (hash(i * 211) - 0.5) * 3,
+      z: 5 + hash(i * 173) * 35,
+      r: 150 + hash(i * 97) * 250,
+      cr: Math.floor(40 + hash(i * 61) * 100),
+      cg: Math.floor(20 + hash(i * 43) * 60),
+      cb: Math.floor(80 + hash(i * 89) * 120),
     });
 
-    const P = { x: 0, y: 0, vx: 0, vy: 0 };
+    const P = { x: 0, y: 0, vx: 0, vy: 0, tilt: 0, tumble: 0 };
     let driftZ = 0;
     let ended = false;
 
@@ -1235,216 +1229,167 @@
 
     // ======== WARP ========
     function drawWarp(dt) {
-      const dur = 8;
+      const dur = 7;
       const p = Math.min(1, phaseT / dur);
       const cx = W / 2, cy = H / 2;
+      const diag = Math.hypot(W, H);
 
-      // 0-0.06: frozen stars, stillness before the jump
-      // 0.06-0.12: THE PUNCH — sudden violent acceleration
-      // 0.12-0.65: full warp — streaks, pulses, color journey
-      // 0.65-0.82: the void between — stars thin out, darkness deepens
-      // 0.82-1.0: mars materializes from warmth
-
+      // speed curve: frozen → violent punch → sustained insanity → decelerate into Mars
       let speed;
-      if (p < 0.06) speed = 0.08;
-      else if (p < 0.12) speed = 0.08 + Math.pow((p - 0.06) / 0.06, 2) * 14;
-      else if (p < 0.65) speed = 9 + (p - 0.12) * 8;
-      else if (p < 0.82) speed = 9 - (p - 0.65) * 30;
-      else speed = Math.max(0.5, 4 - (p - 0.82) * 20);
+      if (p < 0.04) speed = 0;
+      else if (p < 0.1) speed = Math.pow((p - 0.04) / 0.06, 3) * 1.0;
+      else if (p < 0.75) speed = 1.0 + (p - 0.1) * 0.5;
+      else speed = Math.max(0.1, 1.3 - (p - 0.75) * 4.5);
 
-      // background — deep space
-      ctx.fillStyle = "#010103";
+      // slight tunnel rotation
+      const rot = phaseT * 0.08;
+
+      // background: deep black with subtle blue-shift
+      const bgB = Math.min(8, p * 12);
+      ctx.fillStyle = "rgb(1,1," + Math.floor(bgB) + ")";
       ctx.fillRect(0, 0, W, H);
 
-      // color journey: cold white → electric blue → violet → deep red-amber
+      // color evolution: white-blue → deep blue → violet → amber (approaching Mars)
       let cr, cg, cb;
-      if (p < 0.12) {
-        cr = 200; cg = 215; cb = 255;
-      } else if (p < 0.3) {
-        const t = (p - 0.12) / 0.18;
-        cr = Math.floor(200 - t * 140); cg = Math.floor(215 - t * 80); cb = 255;
-      } else if (p < 0.5) {
-        const t = (p - 0.3) / 0.2;
-        cr = Math.floor(60 + t * 100); cg = Math.floor(135 - t * 100); cb = Math.floor(255 - t * 80);
-      } else if (p < 0.65) {
-        const t = (p - 0.5) / 0.15;
-        cr = Math.floor(160 + t * 60); cg = Math.floor(35 + t * 40); cb = Math.floor(175 - t * 120);
+      if (p < 0.15) { cr = 180; cg = 200; cb = 255; }
+      else if (p < 0.35) {
+        const t = (p - 0.15) / 0.2;
+        cr = 180 - t * 120; cg = 200 - t * 100; cb = 255;
+      } else if (p < 0.55) {
+        const t = (p - 0.35) / 0.2;
+        cr = Math.floor(60 + t * 80); cg = Math.floor(100 - t * 60); cb = Math.floor(255 - t * 60);
+      } else if (p < 0.75) {
+        const t = (p - 0.55) / 0.2;
+        cr = Math.floor(140 + t * 50); cg = Math.floor(40 + t * 30); cb = Math.floor(195 - t * 130);
       } else {
-        const t = Math.min(1, (p - 0.65) / 0.2);
-        cr = Math.floor(220 - t * 20); cg = Math.floor(75 + t * 30); cb = Math.floor(55 - t * 30);
+        const t = (p - 0.75) / 0.25;
+        cr = Math.floor(190 + t * 40); cg = Math.floor(70 + t * 50); cb = Math.floor(65 - t * 40);
       }
 
-      // === THE PUNCH — central flash ===
-      if (p > 0.05 && p < 0.18) {
-        const fp = (p - 0.05) / 0.13;
-        const flashA = fp < 0.25 ? fp / 0.25 : Math.max(0, 1 - (fp - 0.25) / 0.75);
-        const flashR = 20 + fp * W * 0.25;
-        const flash = ctx.createRadialGradient(cx, cy, 0, cx, cy, flashR);
-        flash.addColorStop(0, "rgba(220,235,255," + (flashA * 0.8) + ")");
-        flash.addColorStop(0.4, "rgba(140,180,255," + (flashA * 0.3) + ")");
-        flash.addColorStop(1, "rgba(80,120,200,0)");
-        ctx.fillStyle = flash;
+      // === INITIAL FLASH — violent acceleration ===
+      if (p > 0.03 && p < 0.15) {
+        const fp = (p - 0.03) / 0.12;
+        const flashA = fp < 0.2 ? fp / 0.2 : Math.max(0, 1 - (fp - 0.2) / 0.8);
+        ctx.fillStyle = "rgba(200,220,255," + (flashA * 0.9) + ")";
         ctx.fillRect(0, 0, W, H);
       }
 
-      // === CENTRAL VOID — dark eye with luminous corona ===
-      if (p > 0.12 && p < 0.82) {
-        const vi = Math.min(1, (p - 0.12) / 0.15) * (p < 0.7 ? 1 : Math.max(0, (0.82 - p) / 0.12));
-        const innerR = W * 0.02;
-        const outerR = W * 0.18;
-        const corona = ctx.createRadialGradient(cx, cy, innerR, cx, cy, outerR);
-        corona.addColorStop(0, "rgba(0,0,5," + (vi * 0.5) + ")");
-        corona.addColorStop(0.5, "rgba(" + cr + "," + cg + "," + cb + "," + (vi * 0.12) + ")");
-        corona.addColorStop(0.8, "rgba(" + Math.floor(cr*0.5) + "," + Math.floor(cg*0.3) + "," + Math.floor(cb*0.6) + "," + (vi * 0.05) + ")");
-        corona.addColorStop(1, "rgba(0,0,0,0)");
-        ctx.fillStyle = corona;
-        ctx.fillRect(0, 0, W, H);
-      }
+      // === TUNNEL STREAKS — the core visual ===
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(rot);
 
-      // === STARS — with size variation and close-pass flashes ===
-      const starFade = p > 0.65 ? Math.max(0, 1 - (p - 0.65) / 0.15) : 1;
       for (const s of wStars) {
-        s.z -= speed * dt;
-        if (s.z < 0.04) {
-          s.x = (Math.random() - 0.5) * 4;
-          s.y = (Math.random() - 0.5) * 4;
-          s.z = 5.5 + Math.random() * 1.5;
-          s.sz = 0.3 + Math.pow(Math.random(), 3) * 3;
-        }
-        const px = cx + (s.x / s.z) * W * 0.5;
-        const py = cy + (s.y / s.z) * H * 0.5;
-        if (px < -40 || px > W + 40 || py < -40 || py > H + 40) continue;
+        s.z -= speed * dt * s.spd;
+        if (s.z <= 0) { s.z = 1; s.a = Math.random() * Math.PI * 2; s.d = 0.05 + Math.pow(Math.random(), 0.7) * 1.2; }
+        if (s.z > 1) s.z = s.z % 1;
 
-        const bright = Math.min(1, 0.4 / s.z) * starFade;
-        if (bright < 0.01) continue;
+        const invZ = 1 - s.z;
+        const radius = s.d * diag * 0.6 * invZ;
+        const x = Math.cos(s.a) * radius;
+        const y = Math.sin(s.a) * radius;
 
-        // close-pass flash for large stars
-        if (s.z < 0.25 && s.sz > 1.8 && starFade > 0.5) {
-          const flashI = (0.25 - s.z) / 0.25;
-          const fr = 15 + flashI * 50;
-          const fg = ctx.createRadialGradient(px, py, 0, px, py, fr);
-          fg.addColorStop(0, "rgba(255,255,255," + (flashI * 0.25 * starFade) + ")");
-          fg.addColorStop(1, "rgba(" + cr + "," + cg + "," + cb + ",0)");
-          ctx.fillStyle = fg;
-          ctx.fillRect(px - fr, py - fr, fr * 2, fr * 2);
-        }
+        if (Math.abs(x) > W * 0.6 || Math.abs(y) > H * 0.6) continue;
 
-        if (speed > 0.5) {
-          const tailMul = 2 + s.sz * 0.8;
-          const pxP = cx + (s.x / (s.z + speed * dt * tailMul)) * W * 0.5;
-          const pyP = cy + (s.y / (s.z + speed * dt * tailMul)) * H * 0.5;
-          const len = Math.hypot(px - pxP, py - pyP);
-          if (len > 1) {
-            ctx.strokeStyle = "rgba(" + cr + "," + cg + "," + cb + "," + bright + ")";
-            ctx.lineWidth = Math.max(0.3, s.sz * 0.8 / s.z);
-            ctx.beginPath(); ctx.moveTo(pxP, pyP); ctx.lineTo(px, py); ctx.stroke();
-          } else {
-            ctx.fillStyle = "rgba(" + cr + "," + cg + "," + cb + "," + (bright * 0.5) + ")";
-            ctx.fillRect(px - 0.5, py - 0.5, 1, 1);
-          }
-        } else {
-          ctx.fillStyle = "rgba(" + cr + "," + cg + "," + cb + "," + bright + ")";
-          ctx.beginPath(); ctx.arc(px, py, Math.max(0.3, s.sz * 0.4), 0, Math.PI * 2); ctx.fill();
-        }
-      }
+        // streak length proportional to speed and inverse depth
+        const streakLen = speed * invZ * diag * 0.35 * s.spd;
+        if (streakLen < 1 && speed > 0.1) continue;
 
-      // === PULSE RINGS — expand from center like shockwaves ===
-      if (p > 0.15 && p < 0.75) {
-        nextPulse -= dt;
-        if (nextPulse <= 0) {
-          pulseRings.push({ r: 0, a: 0.2 + Math.random() * 0.15 });
-          nextPulse = 0.7 + Math.random() * 0.8;
+        const innerR = s.d * diag * 0.6 * Math.max(0, invZ - speed * dt * s.spd * 2);
+        const x2 = Math.cos(s.a) * innerR;
+        const y2 = Math.sin(s.a) * innerR;
+
+        // brightness: closer = brighter
+        const bright = Math.min(1, invZ * 1.5) * Math.min(1, speed * 2);
+        if (bright < 0.02) continue;
+
+        // color with hue variation
+        const hShift = s.hue * 0.3;
+        const sr = Math.min(255, cr + (s.hue - 0.5) * 60);
+        const sg = Math.min(255, cg + (s.hue - 0.5) * 40);
+        const sb = Math.min(255, cb + (s.hue - 0.5) * 30);
+
+        ctx.strokeStyle = "rgba(" + Math.floor(Math.max(0, sr)) + "," + Math.floor(Math.max(0, sg)) + "," + Math.floor(Math.max(0, sb)) + "," + (bright * 0.85) + ")";
+        ctx.lineWidth = s.w * invZ * 1.8;
+        ctx.beginPath();
+        ctx.moveTo(x2, y2);
+        ctx.lineTo(x, y);
+        ctx.stroke();
+
+        // bright core for thick streaks
+        if (s.w > 2 && bright > 0.4) {
+          ctx.strokeStyle = "rgba(255,255,255," + (bright * 0.4) + ")";
+          ctx.lineWidth = s.w * invZ * 0.6;
+          ctx.beginPath();
+          ctx.moveTo(x2, y2);
+          ctx.lineTo(x, y);
+          ctx.stroke();
         }
       }
-      for (let i = pulseRings.length - 1; i >= 0; i--) {
-        const ring = pulseRings[i];
-        ring.r += dt * W * 0.35;
-        ring.a *= Math.pow(0.4, dt * 2);
-        if (ring.a < 0.005 || ring.r > W) { pulseRings.splice(i, 1); continue; }
-        ctx.strokeStyle = "rgba(" + cr + "," + cg + "," + cb + "," + ring.a + ")";
-        ctx.lineWidth = 1.2;
-        ctx.beginPath(); ctx.arc(cx, cy, ring.r, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+
+      // === CENTRAL GLOW — bright core of the tunnel ===
+      if (speed > 0.2) {
+        const glowI = Math.min(1, (speed - 0.2) / 0.5);
+        const gr = W * 0.08;
+        const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, gr);
+        glow.addColorStop(0, "rgba(255,255,255," + (glowI * 0.15) + ")");
+        glow.addColorStop(0.3, "rgba(" + cr + "," + cg + "," + cb + "," + (glowI * 0.08) + ")");
+        glow.addColorStop(1, "rgba(0,0,0,0)");
+        ctx.fillStyle = glow;
+        ctx.fillRect(cx - gr, cy - gr, gr * 2, gr * 2);
       }
 
-      // === ANAMORPHIC LENS STREAK — horizontal light through center ===
-      if (p > 0.1 && p < 0.8) {
-        const lensI = Math.min(1, (p - 0.1) / 0.1) * (p < 0.72 ? 1 : Math.max(0, (0.8 - p) / 0.08));
-        const lensA = lensI * 0.1;
-        const lensGrad = ctx.createLinearGradient(0, cy, W, cy);
-        lensGrad.addColorStop(0, "rgba(" + cr + "," + cg + "," + cb + ",0)");
-        lensGrad.addColorStop(0.2, "rgba(" + cr + "," + cg + "," + cb + "," + (lensA * 0.4) + ")");
-        lensGrad.addColorStop(0.45, "rgba(255,255,255," + (lensA * 1.2) + ")");
-        lensGrad.addColorStop(0.55, "rgba(255,255,255," + (lensA * 1.2) + ")");
-        lensGrad.addColorStop(0.8, "rgba(" + cr + "," + cg + "," + cb + "," + (lensA * 0.4) + ")");
-        lensGrad.addColorStop(1, "rgba(" + cr + "," + cg + "," + cb + ",0)");
-        ctx.fillStyle = lensGrad;
-        ctx.fillRect(0, cy - 1.5, W, 3);
-
-        // wider soft glow band
-        ctx.fillStyle = lensGrad;
-        ctx.globalAlpha = 0.3;
-        ctx.fillRect(0, cy - 8, W, 16);
-        ctx.globalAlpha = 1;
-      }
-
-      // === NEBULA CLOUDS — drift through colored gas ===
-      if (p > 0.18 && p < 0.75) {
-        const nebI = Math.min(1, (p - 0.18) / 0.1) * (p < 0.65 ? 1 : Math.max(0, (0.75 - p) / 0.1));
-        for (let i = 0; i < 2; i++) {
-          const nx = cx + Math.sin(phaseT * 0.15 + i * 3.7) * W * 0.4;
-          const ny = cy + Math.cos(phaseT * 0.2 + i * 2.3) * H * 0.35;
-          const nr = 100 + p * 180;
-          const nGrad = ctx.createRadialGradient(nx, ny, 0, nx, ny, nr);
-          nGrad.addColorStop(0, "rgba(" + Math.floor(cr * 0.6) + "," + Math.floor(cg * 0.4 + 20) + "," + Math.floor(cb * 0.5) + "," + (nebI * 0.05) + ")");
-          nGrad.addColorStop(1, "rgba(0,0,0,0)");
-          ctx.fillStyle = nGrad;
-          ctx.fillRect(0, 0, W, H);
+      // === VOLUMETRIC LIGHT FOG — layers of colored mist rushing past ===
+      if (p > 0.12 && p < 0.78) {
+        const fogI = Math.min(1, (p - 0.12) / 0.08) * (p < 0.7 ? 1 : Math.max(0, (0.78 - p) / 0.08));
+        for (let i = 0; i < 3; i++) {
+          const fAng = phaseT * 0.3 + i * 2.1;
+          const fDist = W * 0.25 + Math.sin(fAng * 0.7) * W * 0.15;
+          const fx = cx + Math.cos(fAng) * fDist;
+          const fy = cy + Math.sin(fAng) * fDist;
+          const fr = W * 0.3;
+          const fGrad = ctx.createRadialGradient(fx, fy, 0, fx, fy, fr);
+          fGrad.addColorStop(0, "rgba(" + Math.floor(cr * 0.5) + "," + Math.floor(cg * 0.5) + "," + Math.floor(cb * 0.7) + "," + (fogI * 0.04) + ")");
+          fGrad.addColorStop(1, "rgba(0,0,0,0)");
+          ctx.fillStyle = fGrad;
+          ctx.fillRect(fx - fr, fy - fr, fr * 2, fr * 2);
         }
       }
 
-      // === THE VOID — stars gone, deep darkness, just faint color ===
-      if (p > 0.68 && p < 0.84) {
-        const voidI = Math.min(1, (p - 0.68) / 0.06) * (p < 0.78 ? 1 : Math.max(0, (0.84 - p) / 0.06));
-        ctx.fillStyle = "rgba(0,0,3," + (voidI * 0.3) + ")";
-        ctx.fillRect(0, 0, W, H);
+      // === CHROMATIC EDGES — color fringing at screen borders ===
+      if (speed > 0.3) {
+        const edgeI = Math.min(1, (speed - 0.3) / 0.5) * 0.12;
+        ctx.fillStyle = "rgba(" + cr + ",0," + cb + "," + edgeI + ")";
+        ctx.fillRect(0, 0, 3, H);
+        ctx.fillRect(W - 3, 0, 3, H);
+        ctx.fillStyle = "rgba(0," + cg + "," + cb + "," + edgeI + ")";
+        ctx.fillRect(0, 0, W, 3);
+        ctx.fillRect(0, H - 3, W, 3);
       }
 
-      // === VIGNETTE ===
-      const vigR = W * (0.7 - p * 0.15);
-      const vig = ctx.createRadialGradient(cx, cy, vigR * 0.2, cx, cy, vigR);
+      // === VIGNETTE — tight tunnel feel ===
+      const vigR = diag * (0.55 - speed * 0.12);
+      const vig = ctx.createRadialGradient(cx, cy, vigR * 0.3, cx, cy, vigR);
       vig.addColorStop(0, "rgba(0,0,0,0)");
-      vig.addColorStop(1, "rgba(0,0,0," + (0.4 + p * 0.15) + ")");
+      vig.addColorStop(0.7, "rgba(0,0,0," + (0.2 + speed * 0.25) + ")");
+      vig.addColorStop(1, "rgba(0,0,0," + (0.6 + speed * 0.3) + ")");
       ctx.fillStyle = vig;
       ctx.fillRect(0, 0, W, H);
 
-      // === MARS APPROACH — warmth emerging from the void ===
-      if (p > 0.82) {
-        const mp = (p - 0.82) / 0.18;
-        const mr = mp * Math.min(W, H) * 0.85;
+      // === MARS APPROACH — warmth filling the view ===
+      if (p > 0.8) {
+        const mp = (p - 0.8) / 0.2;
+        const mr = mp * mp * Math.min(W, H) * 0.9;
         const mGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(1, mr));
-        mGrad.addColorStop(0, "rgba(180,70,32," + (mp * 0.95) + ")");
-        mGrad.addColorStop(0.25, "rgba(150,55,25," + (mp * 0.75) + ")");
-        mGrad.addColorStop(0.5, "rgba(110,38,18," + (mp * 0.5) + ")");
-        mGrad.addColorStop(0.8, "rgba(60,20,10," + (mp * 0.2) + ")");
-        mGrad.addColorStop(1, "rgba(30,10,5,0)");
+        mGrad.addColorStop(0, "rgba(180,70,32," + (mp * 0.9) + ")");
+        mGrad.addColorStop(0.3, "rgba(140,50,22," + (mp * 0.7) + ")");
+        mGrad.addColorStop(0.6, "rgba(90,35,15," + (mp * 0.4) + ")");
+        mGrad.addColorStop(1, "rgba(40,15,8,0)");
         ctx.fillStyle = mGrad;
         ctx.beginPath(); ctx.arc(cx, cy, mr, 0, Math.PI * 2); ctx.fill();
-
-        // surface detail on mars (subtle radial lines)
-        if (mp > 0.3) {
-          const dAlpha = (mp - 0.3) * 0.06;
-          for (let i = 0; i < 8; i++) {
-            const ang = hash(i * 137) * Math.PI * 2;
-            const len = mr * (0.3 + hash(i * 53) * 0.5);
-            ctx.strokeStyle = "rgba(120,45,20," + dAlpha + ")";
-            ctx.lineWidth = 1 + mp * 2;
-            ctx.beginPath();
-            ctx.moveTo(cx, cy);
-            ctx.lineTo(cx + Math.cos(ang) * len, cy + Math.sin(ang) * len);
-            ctx.stroke();
-          }
-        }
       }
+
 
       if (phaseT >= dur && !fadeCallback) fadeTo("crash");
     }
@@ -1456,6 +1401,7 @@
 
       const dur = 3.5;
       const pr = Math.min(1, phaseT / dur);
+      const ccx = W / 2;
 
       ctx.fillStyle = "#030206";
       ctx.fillRect(0, 0, W, H);
@@ -1479,7 +1425,7 @@
       }
 
       if (marsY < H + 50) {
-        const marsGrad = ctx.createRadialGradient(cx, marsY + H * 0.3, 0, cx, marsY + H * 0.3, H * 0.8);
+        const marsGrad = ctx.createRadialGradient(ccx, marsY + H * 0.3, 0, ccx, marsY + H * 0.3, H * 0.8);
         marsGrad.addColorStop(0, "rgba(130,55,30," + Math.min(0.9, 1.2 - pr) + ")");
         marsGrad.addColorStop(0.4, "rgba(80,35,20," + Math.min(0.7, 1 - pr) + ")");
         marsGrad.addColorStop(1, "rgba(30,12,8,0)");
@@ -1499,7 +1445,7 @@
           const ang = Math.random() * 6.28;
           const spd = 80 + Math.random() * 300;
           cDust.push({
-            x: cx + (Math.random()-0.5)*40, y: marsY + (Math.random()-0.5)*20,
+            x: ccx + (Math.random()-0.5)*40, y: marsY + (Math.random()-0.5)*20,
             vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd - 80,
             life: 1 + Math.random()*0.8, r: 0.5 + Math.random()*3,
           });
@@ -1522,261 +1468,265 @@
 
       if (phaseT >= dur && !fadeCallback) {
         fadeCallback = () => {
-          P.x = 0; P.y = 0; P.vx = 0; P.vy = 0; driftZ = 0; ended = false;
+          P.x = 0; P.y = 0; P.vx = 0; P.vy = 0; P.tilt = 0; P.tumble = 0;
+          driftZ = 0; ended = false;
           phase = "game"; phaseT = 0; fadeTarget = 0;
         };
         fadeTarget = 1;
       }
     }
 
-    // ======== DRIFT (zero-g) ========
+    // ======== DRIFT (3rd person astronaut) ========
     function drawGame(dt) {
       if (ended) return;
 
-      // drift forward always
-      const baseSpd = 1.2;
-      const boost = (keys["ArrowUp"] || keys["KeyW"]) ? 1.6 : 1;
-      driftZ += dt * baseSpd * boost;
+      // auto-drift forward
+      const baseSpd = 1.0;
+      driftZ += dt * baseSpd;
 
-      // gentle lateral/vertical drift controls
-      const driftF = 0.6;
-      if (keys["ArrowLeft"] || keys["KeyA"]) P.vx -= driftF * dt;
-      if (keys["ArrowRight"] || keys["KeyD"]) P.vx += driftF * dt;
-      if (keys["ArrowUp"] || keys["KeyW"]) P.vy -= driftF * dt * 0.3;
-      if (keys["ArrowDown"] || keys["KeyS"]) P.vy += driftF * dt * 0.3;
-      P.vx *= Math.pow(0.97, dt * 60);
-      P.vy *= Math.pow(0.97, dt * 60);
+      // responsive controls — moves the astronaut visibly on screen
+      const accel = 4.0;
+      if (keys["ArrowLeft"] || keys["KeyA"]) P.vx -= accel * dt;
+      if (keys["ArrowRight"] || keys["KeyD"]) P.vx += accel * dt;
+      if (keys["ArrowUp"] || keys["KeyW"]) P.vy -= accel * dt;
+      if (keys["ArrowDown"] || keys["KeyS"]) P.vy += accel * dt;
+      P.vx *= Math.pow(0.92, dt * 60);
+      P.vy *= Math.pow(0.92, dt * 60);
       P.x += P.vx * dt * 60;
       P.y += P.vy * dt * 60;
-      P.x = Math.max(-1.5, Math.min(1.5, P.x));
-      P.y = Math.max(-1, Math.min(1, P.y));
+      P.x = Math.max(-W * 0.35, Math.min(W * 0.35, P.x));
+      P.y = Math.max(-H * 0.3, Math.min(H * 0.3, P.y));
+
+      // tilt toward movement direction
+      const targetTilt = P.vx * 12;
+      P.tilt += (targetTilt - P.tilt) * dt * 4;
+      P.tumble += dt * 0.15;
 
       const progress = Math.min(1, driftZ / DRIFT_DUR);
+      const cx = dCx, cy = dCy;
 
-      // zone colors — visible shifts
+      // background: deep space with evolving tone
       let bgR, bgG, bgB;
-      if (progress < 0.25) {
-        const t = progress / 0.25;
-        bgR = 8 + t * 6; bgG = 3 + t * 2; bgB = 4 + t * 3;
-      } else if (progress < 0.55) {
-        const t = (progress - 0.25) / 0.3;
-        bgR = 14 - t * 8; bgG = 5 - t * 2; bgB = 7 - t * 2;
+      if (progress < 0.3) {
+        const t = progress / 0.3;
+        bgR = 3 + t * 5; bgG = 2 + t * 2; bgB = 6 + t * 4;
+      } else if (progress < 0.6) {
+        const t = (progress - 0.3) / 0.3;
+        bgR = 8 - t * 4; bgG = 4 + t * 3; bgB = 10 + t * 8;
       } else if (progress < 0.85) {
-        const t = (progress - 0.55) / 0.3;
-        bgR = 6 - t * 3; bgG = 3 + t * 2; bgB = 5 + t * 10;
+        const t = (progress - 0.6) / 0.25;
+        bgR = 4 + t * 2; bgG = 7 - t * 3; bgB = 18 - t * 8;
       } else {
         const t = (progress - 0.85) / 0.15;
-        bgR = 3 + t * 4; bgG = 5 + t * 6; bgB = 15 + t * 12;
+        bgR = 6 + t * 8; bgG = 4 + t * 10; bgB = 10 + t * 15;
       }
       ctx.fillStyle = "rgb(" + Math.floor(bgR) + "," + Math.floor(bgG) + "," + Math.floor(bgB) + ")";
       ctx.fillRect(0, 0, W, H);
 
-      // --- FAR STAR FIELD ---
+      // parallax offset from astronaut position
+      const parX = -P.x * 0.15;
+      const parY = -P.y * 0.15;
+
+      // --- DEEP STAR FIELD (500 stars, parallax) ---
       for (const s of farStars) {
-        const dz = s.z - (driftZ % 9);
-        const wz = dz < 0.1 ? dz + 9 : dz;
-        const sc = 180 / wz;
-        const sx = cx + (s.x - P.x * 0.05) * sc;
-        const sy = cy + (s.y - P.y * 0.05) * sc;
-        if (sx < -10 || sx > W + 10 || sy < -10 || sy > H + 10) continue;
-        const tw = 0.15 + 0.85 * Math.sin(s.tw + phaseT * 0.2);
-        const depthB = 1 - Math.min(1, wz / 8);
-        const voidBoost = (progress > 0.5 && progress < 0.88) ? 1.6 : 1;
-        const bright = tw * (0.25 + depthB * 0.3) * voidBoost;
-        ctx.fillStyle = "rgba(228,226,218," + Math.min(0.9, bright) + ")";
-        ctx.beginPath(); ctx.arc(sx, sy, s.r * Math.min(1.5, sc * 0.08), 0, 6.28); ctx.fill();
+        const dz = s.z - (driftZ * 0.3 % 12);
+        const wz = dz < 0.2 ? dz + 12 : dz;
+        const sc = 120 / wz;
+        const sx = cx + (s.x + parX * 0.3) * sc;
+        const sy = cy + (s.y + parY * 0.3) * sc;
+        if (sx < -5 || sx > W + 5 || sy < -5 || sy > H + 5) continue;
+        const tw = 0.3 + 0.7 * (0.5 + 0.5 * Math.sin(s.tw + phaseT * 0.4));
+        const bright = s.bright * tw * Math.min(1, 1.5 / wz);
+        if (bright < 0.03) continue;
+        ctx.fillStyle = "rgba(220,225,235," + Math.min(0.95, bright) + ")";
+        ctx.beginPath(); ctx.arc(sx, sy, s.r * Math.min(1.2, sc * 0.04), 0, 6.28); ctx.fill();
       }
 
-      // --- MARS GLOW (fades as you drift away) ---
-      if (progress < 0.4) {
-        const marsA = (1 - progress / 0.4) * 0.5;
-        const marsR = Math.max(30, (1 - progress / 0.4) * H * 0.4);
-        const mGlow = ctx.createRadialGradient(cx, H + marsR * 0.3, 0, cx, H + marsR * 0.3, marsR);
-        mGlow.addColorStop(0, "rgba(140,55,25," + marsA + ")");
-        mGlow.addColorStop(0.5, "rgba(80,30,15," + (marsA * 0.5) + ")");
+      // --- NEBULAE (gorgeous volumetric color) ---
+      for (const n of nebulae) {
+        const relZ = n.z - driftZ * 0.5;
+        if (relZ < -5 || relZ > 40) continue;
+        const sc = 300 / Math.max(1, relZ);
+        const nx = cx + (n.x + parX * 0.5) * sc;
+        const ny = cy + (n.y + parY * 0.5) * sc;
+        const nr = n.r * sc * 0.01;
+        if (nr < 10) continue;
+        if (nx < -nr || nx > W + nr || ny < -nr || ny > H + nr) continue;
+        const fog = Math.min(0.8, Math.max(0, relZ) / 30);
+        const nA = (1 - fog) * 0.06;
+        if (nA < 0.003) continue;
+        const nG = ctx.createRadialGradient(nx, ny, 0, nx, ny, nr);
+        nG.addColorStop(0, "rgba(" + n.cr + "," + n.cg + "," + n.cb + "," + nA + ")");
+        nG.addColorStop(0.4, "rgba(" + Math.floor(n.cr * 0.6) + "," + Math.floor(n.cg * 0.6) + "," + Math.floor(n.cb * 0.8) + "," + (nA * 0.5) + ")");
+        nG.addColorStop(1, "rgba(" + Math.floor(n.cr * 0.3) + "," + Math.floor(n.cg * 0.3) + "," + Math.floor(n.cb * 0.4) + ",0)");
+        ctx.fillStyle = nG;
+        ctx.fillRect(nx - nr, ny - nr, nr * 2, nr * 2);
+      }
+
+      // --- SPACE DEBRIS (small glowing particles floating past) ---
+      const FOV = 180;
+      for (const d of spaceDebris) {
+        const relZ = d.z - (driftZ * 0.8 % 52);
+        const wz = relZ < 0.5 ? relZ + 52 : relZ;
+        if (wz > 20) continue;
+        const sc = FOV / wz;
+        const sx = cx + (d.x + parX * 0.8) * sc;
+        const sy = cy + (d.y + parY * 0.8) * sc;
+        if (sx < -20 || sx > W + 20 || sy < -20 || sy > H + 20) continue;
+        const r = d.sz * sc * 0.3;
+        const fog = Math.min(0.85, wz / 18);
+        const a = (1 - fog) * 0.5;
+        if (a < 0.02) continue;
+        const warmCol = d.warm > 0.5;
+        const cr = warmCol ? 180 + d.warm * 40 : 130;
+        const cg = warmCol ? 140 : 140 + d.warm * 30;
+        const cb = warmCol ? 100 : 170 + d.warm * 40;
+        if (r < 2) {
+          ctx.fillStyle = "rgba(" + Math.floor(cr) + "," + Math.floor(cg) + "," + Math.floor(cb) + "," + a + ")";
+          ctx.beginPath(); ctx.arc(sx, sy, Math.max(0.3, r), 0, 6.28); ctx.fill();
+        } else {
+          const grd = ctx.createRadialGradient(sx, sy, 0, sx, sy, r);
+          grd.addColorStop(0, "rgba(" + Math.floor(cr) + "," + Math.floor(cg) + "," + Math.floor(cb) + "," + a + ")");
+          grd.addColorStop(0.6, "rgba(" + Math.floor(cr * 0.5) + "," + Math.floor(cg * 0.5) + "," + Math.floor(cb * 0.5) + "," + (a * 0.3) + ")");
+          grd.addColorStop(1, "rgba(0,0,0,0)");
+          ctx.fillStyle = grd;
+          ctx.fillRect(sx - r, sy - r, r * 2, r * 2);
+        }
+      }
+
+      // --- MARS GLOW (fading behind) ---
+      if (progress < 0.3) {
+        const marsA = (1 - progress / 0.3) * 0.4;
+        const marsR = (1 - progress / 0.3) * H * 0.35;
+        const mGlow = ctx.createRadialGradient(cx + parX, H + marsR * 0.2 + parY, 0, cx + parX, H + marsR * 0.2 + parY, marsR);
+        mGlow.addColorStop(0, "rgba(150,60,25," + marsA + ")");
+        mGlow.addColorStop(0.5, "rgba(80,30,12," + (marsA * 0.5) + ")");
         mGlow.addColorStop(1, "rgba(40,15,8,0)");
         ctx.fillStyle = mGlow;
         ctx.fillRect(0, H - marsR, W, marsR + 10);
       }
 
-      // --- NEBULA WASH (appears in void zone) ---
-      if (progress > 0.45 && progress < 0.9) {
-        const nI = progress < 0.55 ? (progress - 0.45) / 0.1 : progress > 0.8 ? (0.9 - progress) / 0.1 : 1;
-        const nA = nI * 0.07;
-        const nG = ctx.createRadialGradient(W * 0.3 - P.x * 20, H * 0.35 - P.y * 20, 0, W * 0.3, H * 0.35, W * 0.5);
-        nG.addColorStop(0, "rgba(50,25,90," + nA + ")");
-        nG.addColorStop(0.4, "rgba(25,18,70," + (nA * 0.5) + ")");
-        nG.addColorStop(1, "rgba(10,8,35,0)");
-        ctx.fillStyle = nG;
-        ctx.fillRect(0, 0, W, H);
-      }
-
-      // --- DEBRIS (dots + soft glows, no polygons) ---
-      const FOV = 200;
-      let closeShake = 0;
-
-      for (const d of debris) {
-        const relZ = d.z - (driftZ % 48);
-        const wz = relZ < 0.5 ? relZ + 48 : relZ;
-        if (wz > 18) continue;
-        const zp = d.zone;
-        if (zp < 0.3 && progress > 0.4) continue;
-        if (zp >= 0.3 && zp < 0.6 && progress > 0.55) continue;
-        if (zp >= 0.6 && (progress < 0.2 || progress > 0.5)) continue;
-        if (progress > 0.55 && progress < 0.85 && zp > 0.08) continue;
-
-        const sc = FOV / wz;
-        const sx = cx + (d.x - P.x * 0.3) * sc;
-        const sy = cy + (d.y - P.y * 0.3) * sc;
-        if (sx < -30 || sx > W + 30 || sy < -30 || sy > H + 30) continue;
-
-        const fog = Math.min(0.9, wz / 16);
-        const r = d.sz * sc * 0.5;
-
-        if (r < 3) {
-          let cr, cg, cb;
-          if (progress < 0.3) { cr = 180 + d.warm * 60; cg = 100 + d.warm * 40; cb = 60 + d.warm * 30; }
-          else if (progress < 0.6) { cr = 160; cg = 155; cb = 150; }
-          else { cr = 120; cg = 130; cb = 160; }
-          ctx.fillStyle = "rgba(" + Math.floor(cr) + "," + Math.floor(cg) + "," + Math.floor(cb) + "," + ((1 - fog) * 0.6) + ")";
-          ctx.beginPath(); ctx.arc(sx, sy, Math.max(0.3, r), 0, 6.28); ctx.fill();
-        } else {
-          const gr = Math.max(2, r);
-          const grd = ctx.createRadialGradient(sx, sy, 0, sx, sy, gr);
-          let cr, cg, cb;
-          if (progress < 0.3) { cr = 160 + d.warm * 50; cg = 80 + d.warm * 30; cb = 40 + d.warm * 20; }
-          else if (progress < 0.6) { cr = 140; cg = 135; cb = 130; }
-          else { cr = 100; cg = 110; cb = 140; }
-          const a = (1 - fog) * 0.45;
-          grd.addColorStop(0, "rgba(" + Math.floor(cr) + "," + Math.floor(cg) + "," + Math.floor(cb) + "," + a + ")");
-          grd.addColorStop(0.5, "rgba(" + Math.floor(cr * 0.6) + "," + Math.floor(cg * 0.6) + "," + Math.floor(cb * 0.6) + "," + (a * 0.4) + ")");
-          grd.addColorStop(1, "rgba(" + Math.floor(cr * 0.3) + "," + Math.floor(cg * 0.3) + "," + Math.floor(cb * 0.3) + ",0)");
-          ctx.fillStyle = grd;
-          ctx.fillRect(sx - gr, sy - gr, gr * 2, gr * 2);
-        }
-      }
-
-      // close-pass shadows (soft dark circles, not polygons)
-      for (const cp of closePasses) {
-        const relZ = cp.z - (driftZ % 48);
-        const wz = relZ < 0.15 ? relZ + 48 : relZ;
-        if (wz > 10) continue;
-        const sc2 = FOV / Math.max(0.1, wz);
-        const sx = cx + cp.x * sc2 * 0.4;
-        const sy = cy + cp.y * sc2 * 0.4;
-        const r = cp.sz * sc2 * 0.04;
-        if (r < 2) continue;
-
-        if (wz < 2.5) closeShake = Math.max(closeShake, (2.5 - wz) / 2.5);
-
-        const grd = ctx.createRadialGradient(sx, sy, r * 0.2, sx, sy, r);
-        const a = Math.min(0.6, r / 200);
-        grd.addColorStop(0, "rgba(3,2,2," + a + ")");
-        grd.addColorStop(0.6, "rgba(3,2,2," + (a * 0.4) + ")");
-        grd.addColorStop(1, "rgba(3,2,2,0)");
-        ctx.fillStyle = grd;
-        ctx.fillRect(sx - r, sy - r, r * 2, r * 2);
-
-        if (wz < 3 && r > 30) {
-          ctx.fillStyle = "rgba(0,0,0," + (a * 0.1) + ")";
-          ctx.fillRect(0, 0, W, H);
-        }
-      }
-
-      // --- BOKEH PARTICLES (near-camera, out of focus) ---
-      for (const b of bokeh) {
-        const relZ = b.z - (driftZ * b.spd % 4);
-        const wz = relZ < 0.1 ? relZ + 4 : relZ;
-        const sc = 80 / wz;
-        const sx = cx + (b.x - P.x * 0.5) * sc;
-        const sy = cy + (b.y - P.y * 0.5) * sc;
-        if (sx < -50 || sx > W + 50 || sy < -50 || sy > H + 50) continue;
-
-        let bokehA = b.a * (1 - Math.min(1, wz / 4));
-        if (progress > 0.55 && progress < 0.85) bokehA *= 0.3;
-        if (bokehA < 0.003) continue;
-
-        const br = b.r * sc * 0.3;
-        const bG = ctx.createRadialGradient(sx, sy, 0, sx, sy, Math.max(1, br));
-        let col;
-        if (progress < 0.3) col = "180,120,80";
-        else if (progress < 0.6) col = "150,145,140";
-        else col = "100,110,140";
-        bG.addColorStop(0, "rgba(" + col + "," + bokehA + ")");
-        bG.addColorStop(0.6, "rgba(" + col + "," + (bokehA * 0.3) + ")");
-        bG.addColorStop(1, "rgba(" + col + ",0)");
-        ctx.fillStyle = bG;
-        ctx.fillRect(sx - br, sy - br, br * 2, br * 2);
-      }
-
-      // --- PALE BLUE DOT (Earth) ---
-      if (progress > 0.75) {
-        const earthI = (progress - 0.75) / 0.25;
-        const earthR = 0.5 + earthI * 5;
-        const earthA = Math.min(0.9, earthI * 1.1);
-        const earthGlow = earthI * 0.09;
-        const ex = cx + P.x * 5, ey = cy * 0.6 + P.y * 5;
-
-        if (earthGlow > 0.005) {
-          const eG = ctx.createRadialGradient(ex, ey, 0, ex, ey, earthR * 20);
-          eG.addColorStop(0, "rgba(100,140,200," + earthGlow + ")");
-          eG.addColorStop(0.5, "rgba(80,120,180," + (earthGlow * 0.3) + ")");
-          eG.addColorStop(1, "rgba(60,100,160,0)");
+      // --- EARTH (pale blue dot growing) ---
+      if (progress > 0.7) {
+        const earthI = (progress - 0.7) / 0.3;
+        const earthR = 1 + earthI * 6;
+        const earthA = Math.min(0.95, earthI * 1.2);
+        const ex = cx * 0.7 + parX * 0.5, ey = cy * 0.4 + parY * 0.5;
+        if (earthI > 0.1) {
+          const eG = ctx.createRadialGradient(ex, ey, 0, ex, ey, earthR * 15);
+          eG.addColorStop(0, "rgba(80,130,200," + (earthI * 0.08) + ")");
+          eG.addColorStop(0.5, "rgba(60,100,170," + (earthI * 0.03) + ")");
+          eG.addColorStop(1, "rgba(40,80,140,0)");
           ctx.fillStyle = eG;
-          ctx.fillRect(ex - earthR * 20, ey - earthR * 20, earthR * 40, earthR * 40);
+          ctx.fillRect(ex - earthR * 15, ey - earthR * 15, earthR * 30, earthR * 30);
         }
-
-        ctx.fillStyle = "rgba(120,160,220," + earthA + ")";
+        ctx.fillStyle = "rgba(100,150,220," + earthA + ")";
         ctx.beginPath(); ctx.arc(ex, ey, earthR, 0, 6.28); ctx.fill();
-
-        ctx.fillStyle = "rgba(180,210,245," + (earthA * 0.5) + ")";
-        ctx.beginPath(); ctx.arc(ex - earthR * 0.2, ey - earthR * 0.2, earthR * 0.5, 0, 6.28); ctx.fill();
+        ctx.fillStyle = "rgba(180,210,245," + (earthA * 0.4) + ")";
+        ctx.beginPath(); ctx.arc(ex - earthR * 0.25, ey - earthR * 0.25, earthR * 0.45, 0, 6.28); ctx.fill();
       }
+
+      // --- ASTRONAUT (3rd person silhouette, center-bottom) ---
+      const ax = cx + P.x;
+      const ay = cy + H * 0.18 + P.y;
+      const aSize = Math.min(W, H) * 0.04;
+
+      ctx.save();
+      ctx.translate(ax, ay);
+      ctx.rotate(P.tilt * 0.02 + Math.sin(P.tumble) * 0.03);
+
+      // suit glow (subtle backlight from space)
+      const suitGlow = ctx.createRadialGradient(0, 0, aSize * 0.3, 0, 0, aSize * 2.5);
+      suitGlow.addColorStop(0, "rgba(100,140,200,0.04)");
+      suitGlow.addColorStop(1, "rgba(60,100,160,0)");
+      ctx.fillStyle = suitGlow;
+      ctx.fillRect(-aSize * 2.5, -aSize * 2.5, aSize * 5, aSize * 5);
+
+      // body
+      ctx.fillStyle = "rgba(15,15,20,0.9)";
+      ctx.beginPath();
+      ctx.ellipse(0, aSize * 0.2, aSize * 0.35, aSize * 0.6, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // helmet
+      ctx.fillStyle = "rgba(20,22,28,0.95)";
+      ctx.beginPath();
+      ctx.arc(0, -aSize * 0.5, aSize * 0.32, 0, Math.PI * 2);
+      ctx.fill();
+
+      // visor reflection
+      ctx.fillStyle = "rgba(80,120,180,0.3)";
+      ctx.beginPath();
+      ctx.arc(aSize * 0.05, -aSize * 0.52, aSize * 0.18, 0, Math.PI * 2);
+      ctx.fill();
+
+      // backpack
+      ctx.fillStyle = "rgba(10,10,14,0.85)";
+      ctx.fillRect(-aSize * 0.2, -aSize * 0.3, -aSize * 0.2, aSize * 0.7);
+
+      // arms (floating pose)
+      const armWave = Math.sin(phaseT * 0.8) * 0.15;
+      ctx.strokeStyle = "rgba(15,15,20,0.85)";
+      ctx.lineWidth = aSize * 0.12;
+      ctx.lineCap = "round";
+      // left arm
+      ctx.beginPath();
+      ctx.moveTo(-aSize * 0.3, -aSize * 0.1);
+      ctx.quadraticCurveTo(-aSize * 0.6, -aSize * 0.3 + armWave * aSize, -aSize * 0.55, -aSize * 0.5 + armWave * aSize);
+      ctx.stroke();
+      // right arm
+      ctx.beginPath();
+      ctx.moveTo(aSize * 0.3, -aSize * 0.1);
+      ctx.quadraticCurveTo(aSize * 0.6, -aSize * 0.2 - armWave * aSize, aSize * 0.5, -aSize * 0.4 - armWave * aSize);
+      ctx.stroke();
+
+      // legs (relaxed float)
+      ctx.beginPath();
+      ctx.moveTo(-aSize * 0.12, aSize * 0.7);
+      ctx.quadraticCurveTo(-aSize * 0.2, aSize * 1.0, -aSize * 0.25, aSize * 1.2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(aSize * 0.12, aSize * 0.7);
+      ctx.quadraticCurveTo(aSize * 0.15, aSize * 1.0, aSize * 0.1, aSize * 1.15);
+      ctx.stroke();
+
+      ctx.restore();
 
       // --- POST-PROCESSING ---
 
-      // close-pass screen shake
-      if (closeShake > 0.01) {
-        const shMag = closeShake * 6;
-        ctx.save();
-        ctx.translate((Math.random() - 0.5) * shMag, (Math.random() - 0.5) * shMag);
-      }
-
       // vignette
-      const vig = ctx.createRadialGradient(cx, cy, W * 0.2, cx, cy, W * 0.75);
+      const vig = ctx.createRadialGradient(cx, cy, W * 0.25, cx, cy, W * 0.7);
       vig.addColorStop(0, "rgba(0,0,0,0)");
-      vig.addColorStop(1, "rgba(0,0,0,0.35)");
+      vig.addColorStop(1, "rgba(0,0,0,0.4)");
       ctx.fillStyle = vig;
       ctx.fillRect(0, 0, W, H);
 
-      // film grain
-      ctx.globalAlpha = 0.012;
-      for (let i = 0; i < 50; i++) {
+      // subtle film grain
+      ctx.globalAlpha = 0.015;
+      for (let i = 0; i < 60; i++) {
         ctx.fillStyle = Math.random() > 0.5 ? "#fff" : "#000";
         ctx.fillRect(Math.random() * W, Math.random() * H, 1, 1);
       }
       ctx.globalAlpha = 1;
 
-      if (closeShake > 0.01) ctx.restore();
-
-      // fade-in from black
-      if (phaseT < 2.5) {
-        ctx.fillStyle = "rgba(0,0,0," + (1 - phaseT / 2.5) + ")";
+      // fade-in
+      if (phaseT < 2) {
+        ctx.fillStyle = "rgba(0,0,0," + (1 - phaseT / 2) + ")";
         ctx.fillRect(0, 0, W, H);
       }
 
-      // subtle control hint
-      if (phaseT > 3 && phaseT < 8) {
-        const hintA = phaseT < 4 ? (phaseT - 3) * 0.12 : Math.max(0, (8 - phaseT) / 4) * 0.12;
-        ctx.fillStyle = "rgba(228,226,218," + hintA + ")";
+      // control hint
+      if (phaseT > 2 && phaseT < 7) {
+        const hintA = phaseT < 3 ? (phaseT - 2) * 0.15 : Math.max(0, (7 - phaseT) / 4) * 0.15;
+        ctx.fillStyle = "rgba(200,210,225," + hintA + ")";
         ctx.font = "11px " + FONT;
         ctx.textAlign = "center";
-        ctx.fillText("arrow keys to drift", cx, H - 40);
+        ctx.fillText("arrow keys to drift", cx, H - 35);
       }
 
-      // ending: gentle white wash when approaching Earth
-      if (progress > 0.9) {
-        const fa = Math.min(1, (progress - 0.9) / 0.1);
+      // ending: white wash approaching Earth
+      if (progress > 0.92) {
+        const fa = Math.min(1, (progress - 0.92) / 0.08);
         ctx.fillStyle = "rgba(255,255,255," + (fa * fa) + ")";
         ctx.fillRect(0, 0, W, H);
         if (fa >= 1 && !ended) { ended = true; setPhase("ending"); }
