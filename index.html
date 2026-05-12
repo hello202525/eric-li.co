@@ -2866,7 +2866,10 @@ void main(){
         const fa = Math.min(1, (progress - 0.92) / 0.08);
         ctx.fillStyle = "rgba(255,255,255," + (fa * fa) + ")";
         ctx.fillRect(0, 0, W, H);
-        if (fa > 0.98 && !ended) { ended = true; fadeTo("ending"); }
+        if (fa > 0.98 && !ended) {
+          ended = true;
+          phase = "ending"; phaseT = 0;
+        }
       }
     }
 
@@ -2920,7 +2923,12 @@ void main(){
         ctx.restore();
       }
 
-      if (t > 4.5) clearWidget();
+      if (t > 0.05) document.body.style.background = "rgb(245,248,252)";
+      if (t > 3) document.body.style.background = "#fff";
+      if (t > 4.5) {
+        document.body.style.background = "";
+        clearWidget();
+      }
     }
 
     function frame(now) {
