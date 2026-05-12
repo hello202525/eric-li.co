@@ -2694,87 +2694,180 @@ void main(){
       }
     }
 
-    // ======== ENDING: Atmospheric return ========
-    // Minimal, tasteful: warm light crescendo → text on paper
-    // No crude planet rendering — just light and atmosphere
+    // ======== ENDING: Earth with wispy clouds ========
     let endingT = 0;
     const welcomeText = "Welcome home.";
     let welcomeRevealed = 0;
     let lastRevealT = 0;
     const endStars = [];
-    for (let i = 0; i < 80; i++) endStars.push({
-      x: Math.random(), y: Math.random() * 0.8,
-      r: 0.3 + Math.random() * 0.7, b: 0.3 + Math.random() * 0.7,
+    for (let i = 0; i < 90; i++) endStars.push({
+      x: Math.random(), y: Math.random() * 0.85,
+      r: 0.3 + Math.random() * 0.6, b: 0.3 + Math.random() * 0.7,
     });
+    // procedural cloud wisps — bezier curves with varying thickness
+    const cloudWisps = [];
+    for (let i = 0; i < 24; i++) {
+      const a = Math.random() * 6.28;
+      const r = 0.2 + Math.random() * 0.55;
+      cloudWisps.push({
+        cx: 0.5 + Math.cos(a) * r * 0.3,
+        cy: 0.5 + Math.sin(a) * r * 0.25,
+        rx: 0.06 + Math.random() * 0.18,
+        ry: 0.02 + Math.random() * 0.06,
+        angle: Math.random() * 3.14 - 1.57,
+        speed: 0.008 + Math.random() * 0.015,
+        alpha: 0.15 + Math.random() * 0.25,
+        phase: Math.random() * 6.28,
+      });
+    }
 
     function drawEnding(dt) {
       endingT += dt;
       const t = endingT;
 
-      // phase 1: space → warm light bloom (0-2.5s)
-      if (t < 2.5) {
-        const p = t / 2.5;
+      // phase 1: space → Earth approach (0-3s)
+      if (t < 3) {
+        const p = t / 3;
         ctx.fillStyle = "#000";
         ctx.fillRect(0, 0, W, H);
 
         // fading stars
-        const starA = Math.max(0, 1 - p * 1.5);
+        const starA = Math.max(0, 1 - p * 1.8);
         if (starA > 0) {
           for (const s of endStars) {
-            ctx.fillStyle = "rgba(200,210,225," + (s.b * starA) + ")";
+            ctx.fillStyle = "rgba(200,215,235," + (s.b * starA) + ")";
             ctx.beginPath(); ctx.arc(s.x * W, s.y * H, s.r, 0, 6.28); ctx.fill();
           }
         }
 
-        // growing warm light from center — like re-entering atmosphere
-        const glowR = p * p * Math.max(W, H) * 0.8;
-        if (glowR > 1) {
-          const glow = ctx.createRadialGradient(W / 2, H * 0.55, 0, W / 2, H * 0.55, glowR);
-          glow.addColorStop(0, "rgba(250,245,235," + (p * p * 0.9) + ")");
-          glow.addColorStop(0.3, "rgba(245,235,215," + (p * p * 0.6) + ")");
-          glow.addColorStop(0.6, "rgba(220,200,170," + (p * p * 0.3) + ")");
-          glow.addColorStop(1, "rgba(180,160,130,0)");
-          ctx.fillStyle = glow;
+        // Earth sphere grows from dot
+        const earthCx = W * 0.5;
+        const earthCy = H * 0.55;
+        const maxR = Math.min(W, H) * 0.35;
+        const earthR = 2 + Math.pow(p, 2.2) * maxR;
+        const earthA = Math.min(1, p * 2.5);
+
+        // atmospheric halo
+        if (earthR > 4) {
+          const hR = earthR * 1.4;
+          const halo = ctx.createRadialGradient(earthCx, earthCy, earthR * 0.85, earthCx, earthCy, hR);
+          halo.addColorStop(0, "rgba(140,190,255," + (earthA * 0.2) + ")");
+          halo.addColorStop(0.6, "rgba(100,160,230," + (earthA * 0.08) + ")");
+          halo.addColorStop(1, "rgba(60,100,180,0)");
+          ctx.fillStyle = halo;
+          ctx.beginPath(); ctx.arc(earthCx, earthCy, hR, 0, 6.28); ctx.fill();
+        }
+
+        // planet body
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(earthCx, earthCy, earthR, 0, 6.28);
+        ctx.clip();
+
+        // deep ocean gradient
+        const oGrad = ctx.createRadialGradient(
+          earthCx - earthR * 0.25, earthCy - earthR * 0.25, 0,
+          earthCx, earthCy, earthR
+        );
+        oGrad.addColorStop(0, "rgba(90,155,220," + earthA + ")");
+        oGrad.addColorStop(0.35, "rgba(55,120,190," + earthA + ")");
+        oGrad.addColorStop(0.65, "rgba(30,80,155," + earthA + ")");
+        oGrad.addColorStop(1, "rgba(12,35,80," + earthA + ")");
+        ctx.fillStyle = oGrad;
+        ctx.fillRect(earthCx - earthR, earthCy - earthR, earthR * 2, earthR * 2);
+
+        // wispy clouds (artistic, flowing bezier strokes)
+        if (earthR > 20) {
+          const cloudA = earthA * Math.min(1, (earthR - 20) / 60);
+          const rot = t * 0.04;
+          ctx.lineCap = "round";
+          ctx.lineJoin = "round";
+          for (const c of cloudWisps) {
+            const cx2 = earthCx + (c.cx - 0.5 + Math.cos(rot * c.speed * 10 + c.phase) * 0.02) * earthR * 2;
+            const cy2 = earthCy + (c.cy - 0.5 + Math.sin(rot * c.speed * 8 + c.phase) * 0.015) * earthR * 2;
+            const rx = c.rx * earthR * 2;
+            const ry = c.ry * earthR * 2;
+            const a = c.angle + rot * c.speed * 3;
+
+            ctx.save();
+            ctx.translate(cx2, cy2);
+            ctx.rotate(a);
+            ctx.beginPath();
+            ctx.moveTo(-rx, 0);
+            ctx.bezierCurveTo(-rx * 0.5, -ry * 1.5, rx * 0.5, -ry * 1.2, rx, 0);
+            ctx.bezierCurveTo(rx * 0.6, ry * 0.8, -rx * 0.3, ry * 1.3, -rx, 0);
+
+            const breath = 0.85 + 0.15 * Math.sin(t * 0.5 + c.phase);
+            ctx.fillStyle = "rgba(255,255,255," + (c.alpha * cloudA * breath) + ")";
+            ctx.fill();
+            ctx.restore();
+          }
+        }
+
+        // spherical shading (lit from upper-left, dark limb)
+        const shade = ctx.createRadialGradient(
+          earthCx - earthR * 0.3, earthCy - earthR * 0.3, 0,
+          earthCx, earthCy, earthR
+        );
+        shade.addColorStop(0, "rgba(255,255,255,0.06)");
+        shade.addColorStop(0.3, "rgba(0,0,0,0)");
+        shade.addColorStop(0.75, "rgba(0,0,20,0.2)");
+        shade.addColorStop(1, "rgba(0,0,10,0.45)");
+        ctx.fillStyle = shade;
+        ctx.fillRect(earthCx - earthR, earthCy - earthR, earthR * 2, earthR * 2);
+
+        ctx.restore();
+
+        // warm light bloom as atmosphere engulfs view (last 30% of phase)
+        if (p > 0.7) {
+          const bp = (p - 0.7) / 0.3;
+          const bR = earthR + bp * Math.max(W, H) * 0.5;
+          const bloom = ctx.createRadialGradient(earthCx, earthCy, earthR * 0.5, earthCx, earthCy, bR);
+          bloom.addColorStop(0, "rgba(220,235,250," + (bp * bp * 0.8) + ")");
+          bloom.addColorStop(0.4, "rgba(200,220,245," + (bp * bp * 0.5) + ")");
+          bloom.addColorStop(0.7, "rgba(180,210,240," + (bp * bp * 0.25) + ")");
+          bloom.addColorStop(1, "rgba(160,195,230,0)");
+          ctx.fillStyle = bloom;
           ctx.fillRect(0, 0, W, H);
         }
       }
-      // phase 2: light → paper color (2.5-4s)
-      else if (t < 4) {
-        const p = (t - 2.5) / 1.5;
-        // warm cream settling to paper
-        const r = Math.floor(250 - p * 3);
-        const g = Math.floor(245 - p * 1);
-        const b = Math.floor(235 + p * 1);
-        ctx.fillStyle = "rgb(" + r + "," + g + "," + b + ")";
+      // phase 2: atmosphere → soft sky-white (3-4.5s)
+      else if (t < 4.5) {
+        const p = (t - 3) / 1.5;
+        // white with a gentle sky-blue tint
+        const r = Math.floor(235 + p * 10);
+        const g = Math.floor(242 + p * 6);
+        const b = Math.floor(248 + p * 4);
+        ctx.fillStyle = "rgb(" + Math.min(245, r) + "," + Math.min(248, g) + "," + Math.min(252, b) + ")";
         ctx.fillRect(0, 0, W, H);
       }
-      // phase 3: hold on paper (4-5.5s)
+      // phase 3: hold sky-white (4.5-6s)
       else {
-        ctx.fillStyle = "#f7f4ec";
+        ctx.fillStyle = "rgb(245,248,252)";
         ctx.fillRect(0, 0, W, H);
       }
 
-      // typewriter text (starts at 2.8s)
-      if (t > 2.8 && welcomeRevealed < welcomeText.length) {
+      // typewriter text (starts at 3.5s)
+      if (t > 3.5 && welcomeRevealed < welcomeText.length) {
         if (t - lastRevealT > 0.09) {
           welcomeRevealed++;
           lastRevealT = t;
         }
       }
 
-      // text: fade in at 2.8, hold, fade out at 4.8
-      const textFade = t < 2.8 ? 0 : t < 3.1 ? (t - 2.8) / 0.3 : t < 4.8 ? 1 : Math.max(0, 1 - (t - 4.8) / 0.5);
+      // text: fade in at 3.5, hold, fade out at 5.3
+      const textFade = t < 3.5 ? 0 : t < 3.8 ? (t - 3.5) / 0.3 : t < 5.3 ? 1 : Math.max(0, 1 - (t - 5.3) / 0.5);
       if (welcomeRevealed > 0 && textFade > 0.01) {
         ctx.save();
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.font = "italic 300 22px 'Iowan Old Style', Georgia, 'Palatino Linotype', Palatino, serif";
-        ctx.fillStyle = "rgba(60,54,44," + (textFade * 0.8) + ")";
+        ctx.fillStyle = "rgba(45,50,60," + (textFade * 0.75) + ")";
         ctx.fillText(welcomeText.slice(0, welcomeRevealed), W / 2, H / 2);
         ctx.restore();
       }
 
-      if (t > 5.5) clearWidget();
+      if (t > 6.0) clearWidget();
     }
 
     function frame(now) {
@@ -2895,7 +2988,11 @@ void main(){
 
       let idx = 0;
       function revealNext() {
-        if (idx >= allSpans.length) return;
+        if (idx >= allSpans.length) {
+          // restore #end span transitions so hover works smoothly
+          endLetters.forEach(s => { s.style.transition = ""; s.style.opacity = ""; });
+          return;
+        }
         allSpans[idx].style.opacity = "1";
         idx++;
         const ch = allSpans[idx - 1].textContent;
