@@ -2107,17 +2107,19 @@ in vec2 v_uv;
 out vec4 fragColor;
 
 vec3 marsColor(float t){
-  // deep reddish-brown -> rust -> orange -> amber -> pale gold
-  vec3 c0 = vec3(0.08, 0.02, 0.01);
-  vec3 c1 = vec3(0.35, 0.08, 0.02);
-  vec3 c2 = vec3(0.65, 0.18, 0.04);
-  vec3 c3 = vec3(0.85, 0.40, 0.10);
-  vec3 c4 = vec3(1.0, 0.80, 0.45);
+  // black crust -> deep red -> orange -> bright yellow-white
+  vec3 c0 = vec3(0.02, 0.005, 0.003);
+  vec3 c1 = vec3(0.15, 0.02, 0.005);
+  vec3 c2 = vec3(0.5, 0.06, 0.01);
+  vec3 c3 = vec3(0.85, 0.25, 0.03);
+  vec3 c4 = vec3(1.0, 0.65, 0.2);
+  vec3 c5 = vec3(1.0, 0.95, 0.7);
   t = clamp(t, 0.0, 1.0);
-  if(t < 0.25) return mix(c0, c1, t / 0.25);
-  if(t < 0.5) return mix(c1, c2, (t-0.25)/0.25);
-  if(t < 0.75) return mix(c2, c3, (t-0.5)/0.25);
-  return mix(c3, c4, (t-0.75)/0.25);
+  if(t < 0.15) return mix(c0, c1, t / 0.15);
+  if(t < 0.35) return mix(c1, c2, (t-0.15)/0.2);
+  if(t < 0.55) return mix(c2, c3, (t-0.35)/0.2);
+  if(t < 0.8) return mix(c3, c4, (t-0.55)/0.25);
+  return mix(c4, c5, (t-0.8)/0.2);
 }
 
 float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7)))*43758.5453); }
@@ -2156,54 +2158,75 @@ void main(){
   vec4 texState = texture(u_state, texUV);
 
   // blend textured lookup with raw state inside planet
-  float inPlanet = smoothstep(planetR, planetR * 0.6, dist);
-  vec4 s = mix(state, texState, inPlanet * 0.5);
+  float inPlanet = smoothstep(planetR, planetR * 0.5, dist);
+  vec4 s = mix(state, texState, inPlanet * 0.6);
 
   // chromatic aberration
-  vec2 chromDir = normalize(centered + 0.0001) * 0.004 * smoothstep(planetR*0.4, planetR, dist);
-  vec4 stR = texture(u_state, uv + chromDir);
-  vec4 stB = texture(u_state, uv - chromDir);
+  vec2 chromDir = normalize(centered + 0.0001) * 0.005 * smoothstep(planetR*0.3, planetR, dist);
+  vec4 stR = texture(u_state, sampleUV + chromDir);
+  vec4 stB = texture(u_state, sampleUV - chromDir);
 
-  float emR = stR.z * 0.9 + stR.w * 1.8 + length(stR.xy) * 0.5;
-  float emG = s.z * 0.9 + s.w * 1.8 + length(s.xy) * 0.5;
-  float emB = stB.z * 0.9 + stB.w * 1.8 + length(stB.xy) * 0.5;
+  // temperature is the primary driver of brightness — creates pools vs crust
+  float tempR = stR.w;
+  float tempG = s.w;
+  float tempB = stB.w;
 
-  float tR = clamp(stR.w * 2.5 + length(stR.xy) * 0.3, 0.0, 1.0);
-  float tG = clamp(s.w * 2.5 + length(s.xy) * 0.3, 0.0, 1.0);
-  float tB = clamp(stB.w * 2.5 + length(stB.xy) * 0.3, 0.0, 1.0);
+  // velocity magnitude creates flow patterns
+  float flowR = length(stR.xy);
+  float flowG = length(s.xy);
+  float flowB = length(stB.xy);
+
+  // density creates dark crusty regions when cool
+  float densG = s.z;
+
+  // color lookup: temp^2 to create sharp contrast between hot/cold
+  float tR = clamp(tempR * tempR * 6.0 + flowR * 0.4, 0.0, 1.0);
+  float tG = clamp(tempG * tempG * 6.0 + flowG * 0.4, 0.0, 1.0);
+  float tB = clamp(tempB * tempB * 6.0 + flowB * 0.4, 0.0, 1.0);
 
   vec3 col;
-  col.r = marsColor(tR).r * emR;
-  col.g = marsColor(tG).g * emG;
-  col.b = marsColor(tB).b * emB;
+  col.r = marsColor(tR).r;
+  col.g = marsColor(tG).g;
+  col.b = marsColor(tB).b;
 
-  // dark cracks in cool dense regions (magma texture)
-  float coolDense = s.z * (1.0 - clamp(s.w * 2.0, 0.0, 1.0));
-  float crackNoise = vnoise(uv * 24.0 + u_time * 0.01) * vnoise(uv * 48.0 - u_time * 0.015);
-  col += vec3(0.3, 0.05, 0.01) * coolDense;
-  col *= 1.0 - crackNoise * 0.3 * inPlanet * (1.0 - tG);
+  // emission brightness driven by temperature
+  float brightness = 0.15 + tempG * 2.0 + flowG * 0.8;
+  col *= brightness;
 
-  // hot fissure lines
-  float fissure = smoothstep(0.48, 0.52, vnoise(uv * 12.0 + vec2(u_time * 0.02, -u_time * 0.015)));
-  col += vec3(1.0, 0.4, 0.05) * fissure * s.w * 0.4 * inPlanet;
+  // dark cooled crust: where density is high but temp is low → near black
+  float cooledCrust = densG * (1.0 - clamp(tempG * 3.0, 0.0, 1.0));
+  col *= 1.0 - cooledCrust * 0.7;
 
-  // bloom
+  // cracks: noise-based dark lines through cooled regions
+  float crack1 = vnoise(sampleUV * 40.0 + u_time * 0.008);
+  float crack2 = vnoise(sampleUV * 60.0 - u_time * 0.012 + 5.0);
+  float cracks = smoothstep(0.4, 0.5, crack1) * smoothstep(0.4, 0.5, crack2);
+  col *= 1.0 - cracks * 0.6 * inPlanet * cooledCrust;
+
+  // glowing pools: where temp is high and flow is low (pooled heat)
+  float pooled = tempG * tempG * (1.0 - clamp(flowG * 4.0, 0.0, 1.0));
+  col += marsColor(clamp(pooled * 4.0, 0.0, 1.0)) * pooled * 1.5;
+
+  // hot fissure lines between crust plates
+  float fissure = smoothstep(0.46, 0.54, vnoise(sampleUV * 15.0 + vec2(u_time * 0.015, -u_time * 0.01)));
+  float fissureHeat = fissure * tempG * cooledCrust;
+  col += vec3(1.0, 0.35, 0.02) * fissureHeat * 2.0;
+
+  // bloom (wider, more dramatic)
   vec2 px = 1.0 / u_res;
   vec3 bloom = vec3(0.0);
-  for(int i = 1; i <= 8; i++){
+  for(int i = 1; i <= 10; i++){
     float fi = float(i);
-    float w = 1.0 / (fi * 1.1 + 1.0);
-    float off = fi * 3.0;
-    vec4 sR2 = texture(u_state, uv + vec2(off*px.x, 0));
-    vec4 sL2 = texture(u_state, uv - vec2(off*px.x, 0));
-    vec4 sU2 = texture(u_state, uv + vec2(0, off*px.y));
-    vec4 sD2 = texture(u_state, uv - vec2(0, off*px.y));
-    bloom += marsColor(clamp(sR2.w*3.0,0.0,1.0)) * (sR2.z+sR2.w) * w;
-    bloom += marsColor(clamp(sL2.w*3.0,0.0,1.0)) * (sL2.z+sL2.w) * w;
-    bloom += marsColor(clamp(sU2.w*3.0,0.0,1.0)) * (sU2.z+sU2.w) * w;
-    bloom += marsColor(clamp(sD2.w*3.0,0.0,1.0)) * (sD2.z+sD2.w) * w;
+    float w = 1.0 / (fi + 1.0);
+    float off = fi * 3.5;
+    vec4 sR2 = texture(u_state, sampleUV + vec2(off*px.x, 0));
+    vec4 sL2 = texture(u_state, sampleUV - vec2(off*px.x, 0));
+    vec4 sU2 = texture(u_state, sampleUV + vec2(0, off*px.y));
+    vec4 sD2 = texture(u_state, sampleUV - vec2(0, off*px.y));
+    float bw = (sR2.w + sL2.w + sU2.w + sD2.w) * 0.25;
+    bloom += marsColor(clamp(bw * 4.0, 0.0, 1.0)) * bw * w;
   }
-  col += bloom * 0.1;
+  col += bloom * 0.15;
 
   // ACES tone mapping
   col = (col * (2.51 * col + 0.03)) / (col * (2.43 * col + 0.59) + 0.14);
@@ -2286,7 +2309,7 @@ void main(){
       let fboA = makeFBO(sW, sH);
       let fboB = makeFBO(sW, sH);
 
-      // seed: nebular density with radial falloff (impact burst)
+      // seed: patchy magma with hot pools and cold crust
       const initData = new Float32Array(sW * sH * 4);
       for (let y = 0; y < sH; y++) {
         for (let x = 0; x < sW; x++) {
@@ -2294,15 +2317,20 @@ void main(){
           const u = x / sW, v = y / sH;
           const cx2 = u - 0.5, cy2 = v - 0.5;
           const dd = Math.sqrt(cx2*cx2 + cy2*cy2);
-          const falloff = Math.exp(-dd * dd * 9);
+          const falloff = Math.exp(-dd * dd * 10);
           const n1 = Math.sin(u*17.3 + v*13.7) * Math.cos(u*23.1 - v*7.3);
           const n2 = Math.sin(u*31.1 + v*29.3 + 1.7) * Math.cos(u*11.3 + v*19.1);
           const n3 = Math.sin(u*43.7 - v*37.3 + 3.1) * Math.cos(u*53.1 + v*41.7);
-          const dens = (0.6 + 0.7 * Math.abs(n1 + n2 * 0.5 + n3 * 0.25)) * falloff;
-          const tmp = dens * 0.5 * falloff;
+          // patchy: some areas hot pools, some dead crust
+          const patch = Math.max(0, n1 * n2 * 4.0);
+          const hotspot = Math.exp(-((u-0.35)*(u-0.35)+(v-0.4)*(v-0.4))*30) +
+                         Math.exp(-((u-0.6)*(u-0.6)+(v-0.65)*(v-0.65))*25) +
+                         Math.exp(-((u-0.45)*(u-0.45)+(v-0.55)*(v-0.55))*35);
+          const dens = (0.3 + patch * 0.8 + hotspot * 0.6) * falloff;
+          const tmp = (patch * 0.6 + hotspot * 0.9) * falloff;
           const ang = Math.atan2(cy2, cx2);
-          initData[idx] = (n2 * 0.12 - Math.sin(ang) * 0.06) * falloff;
-          initData[idx+1] = (n3 * 0.12 + Math.cos(ang) * 0.06) * falloff;
+          initData[idx] = (n2 * 0.1 - Math.sin(ang) * 0.08) * falloff;
+          initData[idx+1] = (n3 * 0.1 + Math.cos(ang) * 0.08) * falloff;
           initData[idx+2] = dens;
           initData[idx+3] = tmp;
         }
