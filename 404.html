@@ -1058,13 +1058,13 @@
     let rY = H * 0.65, rVel = 0, rRot = 0;
     const exhaust = [];
     const bgStars = [];
-    for (let i = 0; i < 180; i++) bgStars.push({
-      a: hash(i) * Math.PI * 2,
-      d: 0.15 + hash(i + 999) * 0.85,
-      r: 0.15 + hash(i + 500) * 0.9,
-      b: 0.2 + hash(i + 250) * 0.6,
+    for (let i = 0; i < 500; i++) bgStars.push({
+      x: hash(i * 7) * W,
+      y: hash(i * 13) * H,
+      r: 0.2 + Math.pow(hash(i + 500), 2) * 1.2,
+      b: 0.15 + hash(i + 250) * 0.7,
       tw: hash(i + 777) * 6.28,
-      twSpd: 0.3 + hash(i + 333) * 1.2,
+      twSpd: 0.2 + hash(i + 333) * 1.5,
     });
 
     // ===== WARP STATE =====
@@ -1125,19 +1125,18 @@
       ctx.fillStyle = "#020204";
       ctx.fillRect(0, 0, W, H);
 
-      // stars rotate around center progressively faster, twinkle
-      const starRotSpeed = phaseT < 2 ? phaseT * 0.003 : 0.006 + (phaseT - 2) * 0.015;
-      const starRot = phaseT * starRotSpeed;
+      // star field: gentle rotation of entire field + twinkle
+      const fieldRot = phaseT < 1.5 ? phaseT * 0.002 : 0.003 + (phaseT - 1.5) * 0.008;
+      const cosR = Math.cos(phaseT * fieldRot), sinR = Math.sin(phaseT * fieldRot);
       const scx = W / 2, scy = H / 2;
       for (const s of bgStars) {
-        const ang = s.a + starRot * (0.5 + s.d * 0.5);
-        const dist = s.d * Math.max(W, H) * 0.7;
-        const sx = scx + Math.cos(ang) * dist;
-        const sy = scy + Math.sin(ang) * dist;
-        const twinkle = 0.5 + 0.5 * Math.sin(s.tw + phaseT * s.twSpd);
+        const dx = s.x - scx, dy = s.y - scy;
+        const sx = scx + dx * cosR - dy * sinR;
+        const sy = scy + dx * sinR + dy * cosR;
+        const twinkle = 0.4 + 0.6 * (0.5 + 0.5 * Math.sin(s.tw + phaseT * s.twSpd));
         const bright = s.b * twinkle;
         if (bright < 0.03) continue;
-        ctx.fillStyle = "rgba(232,230,223," + bright + ")";
+        ctx.fillStyle = "rgba(225,223,218," + bright + ")";
         ctx.beginPath(); ctx.arc(sx, sy, s.r, 0, Math.PI * 2); ctx.fill();
       }
 
