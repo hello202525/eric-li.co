@@ -2713,18 +2713,18 @@ void main(){
       x: Math.random(), y: Math.random() * 0.85,
       r: 0.3 + Math.random() * 0.6, b: 0.3 + Math.random() * 0.7,
     });
-    // cloud particles — soft dots that cluster into wispy formations
-    const cloudParts = [];
-    for (let i = 0; i < 280; i++) {
-      const band = Math.floor(Math.random() * 7);
-      const bandY = -0.3 + band * 0.1 + (Math.random() - 0.5) * 0.06;
-      const x = (Math.random() - 0.5) * 0.8;
-      cloudParts.push({
-        x: x,
-        y: bandY + Math.sin(x * 8 + band) * 0.03,
-        r: 0.008 + Math.random() * 0.018,
-        a: 0.06 + Math.random() * 0.14,
-        drift: 0.003 + Math.random() * 0.008,
+    // smoke cloud layer — rendered to offscreen canvas with blur
+    const smokeCanvas = document.createElement("canvas");
+    const smokeCtx = smokeCanvas.getContext("2d");
+    const smokePuffs = [];
+    for (let i = 0; i < 60; i++) {
+      smokePuffs.push({
+        x: Math.random(),
+        y: 0.2 + Math.random() * 0.6,
+        r: 0.04 + Math.random() * 0.1,
+        a: 0.3 + Math.random() * 0.5,
+        dx: (Math.random() - 0.5) * 0.01,
+        dy: (Math.random() - 0.5) * 0.005,
         phase: Math.random() * 6.28,
       });
     }
@@ -2784,27 +2784,26 @@ void main(){
         ctx.fillStyle = oGrad;
         ctx.fillRect(earthCx - earthR, earthCy - earthR, earthR * 2, earthR * 2);
 
-        // wispy clouds — soft particle clusters that drift
-        if (earthR > 20) {
-          const cloudA = earthA * Math.min(1, (earthR - 20) / 50);
-          const drift = t * 0.02;
-          for (const c of cloudParts) {
-            const px = c.x + drift * c.drift + Math.sin(t * 0.3 + c.phase) * 0.008;
-            const wrapped = ((px + 0.5) % 1.0) - 0.5;
-            const py = c.y + Math.sin(drift * 2 + c.phase) * 0.01;
-            const sx = earthCx + wrapped * earthR * 2;
-            const sy = earthCy + py * earthR * 2;
-            const sr = c.r * earthR * 2;
-            const breath = 0.8 + 0.2 * Math.sin(t * 0.7 + c.phase);
-            const alpha = c.a * cloudA * breath;
-            if (alpha < 0.01) continue;
-            const g = ctx.createRadialGradient(sx, sy, 0, sx, sy, sr);
-            g.addColorStop(0, "rgba(255,255,255," + alpha + ")");
-            g.addColorStop(0.6, "rgba(255,255,255," + (alpha * 0.4) + ")");
-            g.addColorStop(1, "rgba(255,255,255,0)");
-            ctx.fillStyle = g;
-            ctx.fillRect(sx - sr, sy - sr, sr * 2, sr * 2);
+        // smoky clouds — paint blobs to offscreen canvas, blur, composite
+        if (earthR > 25) {
+          const cloudA = earthA * Math.min(1, (earthR - 25) / 40);
+          const sz = Math.ceil(earthR * 2);
+          smokeCanvas.width = sz;
+          smokeCanvas.height = sz;
+          smokeCtx.clearRect(0, 0, sz, sz);
+          smokeCtx.filter = "blur(" + Math.max(3, earthR * 0.08) + "px)";
+          const drift = t * 0.015;
+          for (const p of smokePuffs) {
+            const px = ((p.x + drift * p.dx + Math.sin(t * 0.2 + p.phase) * 0.02) % 1.0 + 1) % 1.0;
+            const py = p.y + Math.sin(t * 0.15 + p.phase * 2) * 0.03;
+            const breath = 0.7 + 0.3 * Math.sin(t * 0.4 + p.phase);
+            smokeCtx.fillStyle = "rgba(255,255,255," + (p.a * breath * cloudA) + ")";
+            smokeCtx.beginPath();
+            smokeCtx.arc(px * sz, py * sz, p.r * sz, 0, 6.28);
+            smokeCtx.fill();
           }
+          smokeCtx.filter = "none";
+          ctx.drawImage(smokeCanvas, earthCx - earthR, earthCy - earthR, sz, sz);
         }
 
         // spherical shading (lit from upper-left, dark limb)
