@@ -1234,150 +1234,184 @@
       const cx = W / 2, cy = H / 2;
       const diag = Math.hypot(W, H);
 
-      // speed curve: frozen → violent punch → sustained insanity → decelerate into Mars
+      // speed: stillness → violent punch → sustained → decelerate
       let speed;
       if (p < 0.04) speed = 0;
       else if (p < 0.1) speed = Math.pow((p - 0.04) / 0.06, 3) * 1.0;
-      else if (p < 0.75) speed = 1.0 + (p - 0.1) * 0.5;
-      else speed = Math.max(0.1, 1.3 - (p - 0.75) * 4.5);
+      else if (p < 0.75) speed = 1.0 + (p - 0.1) * 0.6;
+      else speed = Math.max(0.08, 1.4 - (p - 0.75) * 5.0);
 
-      // slight tunnel rotation
-      const rot = phaseT * 0.08;
+      const rot = phaseT * 0.06;
 
-      // background: deep black with subtle blue-shift
-      const bgB = Math.min(8, p * 12);
-      ctx.fillStyle = "rgb(1,1," + Math.floor(bgB) + ")";
+      // background: very deep blue-black
+      ctx.fillStyle = "rgb(1,1," + Math.floor(Math.min(6, p * 8)) + ")";
       ctx.fillRect(0, 0, W, H);
 
-      // color evolution: white-blue → deep blue → violet → amber (approaching Mars)
+      // color journey
       let cr, cg, cb;
-      if (p < 0.15) { cr = 180; cg = 200; cb = 255; }
-      else if (p < 0.35) {
-        const t = (p - 0.15) / 0.2;
-        cr = 180 - t * 120; cg = 200 - t * 100; cb = 255;
-      } else if (p < 0.55) {
-        const t = (p - 0.35) / 0.2;
-        cr = Math.floor(60 + t * 80); cg = Math.floor(100 - t * 60); cb = Math.floor(255 - t * 60);
-      } else if (p < 0.75) {
-        const t = (p - 0.55) / 0.2;
-        cr = Math.floor(140 + t * 50); cg = Math.floor(40 + t * 30); cb = Math.floor(195 - t * 130);
+      if (p < 0.12) { cr = 180; cg = 200; cb = 255; }
+      else if (p < 0.3) {
+        const t = (p - 0.12) / 0.18;
+        cr = 180 - t * 110; cg = 200 - t * 90; cb = 255;
+      } else if (p < 0.5) {
+        const t = (p - 0.3) / 0.2;
+        cr = Math.floor(70 + t * 90); cg = Math.floor(110 - t * 70); cb = Math.floor(255 - t * 50);
+      } else if (p < 0.72) {
+        const t = (p - 0.5) / 0.22;
+        cr = Math.floor(160 + t * 40); cg = Math.floor(40 + t * 30); cb = Math.floor(205 - t * 140);
       } else {
-        const t = (p - 0.75) / 0.25;
-        cr = Math.floor(190 + t * 40); cg = Math.floor(70 + t * 50); cb = Math.floor(65 - t * 40);
+        const t = (p - 0.72) / 0.28;
+        cr = Math.floor(200 + t * 30); cg = Math.floor(70 + t * 50); cb = Math.floor(65 - t * 40);
       }
 
-      // === INITIAL FLASH — violent acceleration ===
-      if (p > 0.03 && p < 0.15) {
-        const fp = (p - 0.03) / 0.12;
-        const flashA = fp < 0.2 ? fp / 0.2 : Math.max(0, 1 - (fp - 0.2) / 0.8);
-        ctx.fillStyle = "rgba(200,220,255," + (flashA * 0.9) + ")";
+      // === DEPTH RINGS — concentric light bands rushing toward camera ===
+      if (speed > 0.2 && p < 0.82) {
+        const ringI = Math.min(1, (speed - 0.2) / 0.4) * (p < 0.75 ? 1 : (0.82 - p) / 0.07);
+        for (let i = 0; i < 5; i++) {
+          let rz = ((hash(i * 37) + phaseT * 0.6 * (0.5 + hash(i * 71) * 0.5)) % 1);
+          const ringR = diag * 0.5 * (1 - rz);
+          if (ringR < 5 || ringR > diag * 0.55) continue;
+          const ringA = ringI * (1 - rz) * 0.08;
+          ctx.strokeStyle = "rgba(" + cr + "," + cg + "," + cb + "," + ringA + ")";
+          ctx.lineWidth = 1.5 + (1 - rz) * 3;
+          ctx.beginPath(); ctx.arc(cx, cy, ringR, 0, Math.PI * 2); ctx.stroke();
+        }
+      }
+
+      // === INITIAL FLASH ===
+      if (p > 0.03 && p < 0.14) {
+        const fp = (p - 0.03) / 0.11;
+        const flashA = fp < 0.15 ? fp / 0.15 : Math.max(0, 1 - (fp - 0.15) / 0.85);
+        ctx.fillStyle = "rgba(200,220,255," + (flashA * 0.85) + ")";
         ctx.fillRect(0, 0, W, H);
       }
 
-      // === TUNNEL STREAKS — the core visual ===
+      // === TUNNEL STREAKS (3 depth layers with different behaviors) ===
       ctx.save();
       ctx.translate(cx, cy);
       ctx.rotate(rot);
 
       for (const s of wStars) {
         s.z -= speed * dt * s.spd;
-        if (s.z <= 0) { s.z = 1; s.a = Math.random() * Math.PI * 2; s.d = 0.05 + Math.pow(Math.random(), 0.7) * 1.2; }
+        if (s.z <= 0) {
+          s.z = 1;
+          s.a = Math.random() * Math.PI * 2;
+          s.d = 0.04 + Math.pow(Math.random(), 0.6) * 1.3;
+        }
         if (s.z > 1) s.z = s.z % 1;
 
         const invZ = 1 - s.z;
-        const radius = s.d * diag * 0.6 * invZ;
-        const x = Math.cos(s.a) * radius;
-        const y = Math.sin(s.a) * radius;
+        // spiral: stars at different depths spiral at different rates
+        const spiralOffset = invZ * invZ * 0.3 * s.spd;
+        const angle = s.a + spiralOffset;
+        const radius = s.d * diag * 0.65 * invZ;
+        const x = Math.cos(angle) * radius;
+        const y = Math.sin(angle) * radius;
 
-        if (Math.abs(x) > W * 0.6 || Math.abs(y) > H * 0.6) continue;
+        if (Math.abs(x) > W * 0.65 || Math.abs(y) > H * 0.65) continue;
 
-        // streak length proportional to speed and inverse depth
-        const streakLen = speed * invZ * diag * 0.35 * s.spd;
-        if (streakLen < 1 && speed > 0.1) continue;
+        const innerInvZ = Math.max(0, invZ - speed * dt * s.spd * 3);
+        const innerR = s.d * diag * 0.65 * innerInvZ;
+        const x2 = Math.cos(angle) * innerR;
+        const y2 = Math.sin(angle) * innerR;
 
-        const innerR = s.d * diag * 0.6 * Math.max(0, invZ - speed * dt * s.spd * 2);
-        const x2 = Math.cos(s.a) * innerR;
-        const y2 = Math.sin(s.a) * innerR;
+        const bright = Math.min(1, invZ * invZ * 2.5) * Math.min(1, speed * 1.5);
+        if (bright < 0.015) continue;
 
-        // brightness: closer = brighter
-        const bright = Math.min(1, invZ * 1.5) * Math.min(1, speed * 2);
-        if (bright < 0.02) continue;
+        const sr = Math.min(255, Math.max(0, cr + (s.hue - 0.5) * 80));
+        const sg = Math.min(255, Math.max(0, cg + (s.hue - 0.5) * 50));
+        const sb = Math.min(255, Math.max(0, cb + (s.hue - 0.5) * 40));
 
-        // color with hue variation
-        const hShift = s.hue * 0.3;
-        const sr = Math.min(255, cr + (s.hue - 0.5) * 60);
-        const sg = Math.min(255, cg + (s.hue - 0.5) * 40);
-        const sb = Math.min(255, cb + (s.hue - 0.5) * 30);
+        // line width varies with depth — close streaks are thick and bright
+        const lw = s.w * invZ * 2.2;
+        ctx.strokeStyle = "rgba(" + Math.floor(sr) + "," + Math.floor(sg) + "," + Math.floor(sb) + "," + (bright * 0.8) + ")";
+        ctx.lineWidth = lw;
+        ctx.beginPath(); ctx.moveTo(x2, y2); ctx.lineTo(x, y); ctx.stroke();
 
-        ctx.strokeStyle = "rgba(" + Math.floor(Math.max(0, sr)) + "," + Math.floor(Math.max(0, sg)) + "," + Math.floor(Math.max(0, sb)) + "," + (bright * 0.85) + ")";
-        ctx.lineWidth = s.w * invZ * 1.8;
-        ctx.beginPath();
-        ctx.moveTo(x2, y2);
-        ctx.lineTo(x, y);
-        ctx.stroke();
+        // white-hot core on close thick streaks
+        if (invZ > 0.7 && s.w > 1.5) {
+          ctx.strokeStyle = "rgba(255,255,255," + (bright * 0.5) + ")";
+          ctx.lineWidth = lw * 0.35;
+          ctx.beginPath(); ctx.moveTo(x2, y2); ctx.lineTo(x, y); ctx.stroke();
+        }
 
-        // bright core for thick streaks
-        if (s.w > 2 && bright > 0.4) {
-          ctx.strokeStyle = "rgba(255,255,255," + (bright * 0.4) + ")";
-          ctx.lineWidth = s.w * invZ * 0.6;
-          ctx.beginPath();
-          ctx.moveTo(x2, y2);
-          ctx.lineTo(x, y);
-          ctx.stroke();
+        // close-pass FLASH: big stars that whoosh past produce a bright bloom
+        if (invZ > 0.92 && s.w > 2.5 && s.d > 0.6) {
+          const flashI = (invZ - 0.92) / 0.08;
+          const fr = 20 + flashI * 60;
+          const fGrad = ctx.createRadialGradient(x, y, 0, x, y, fr);
+          fGrad.addColorStop(0, "rgba(255,255,255," + (flashI * 0.3) + ")");
+          fGrad.addColorStop(0.3, "rgba(" + Math.floor(sr) + "," + Math.floor(sg) + "," + Math.floor(sb) + "," + (flashI * 0.15) + ")");
+          fGrad.addColorStop(1, "rgba(0,0,0,0)");
+          ctx.fillStyle = fGrad;
+          ctx.fillRect(x - fr, y - fr, fr * 2, fr * 2);
         }
       }
       ctx.restore();
 
-      // === CENTRAL GLOW — bright core of the tunnel ===
-      if (speed > 0.2) {
-        const glowI = Math.min(1, (speed - 0.2) / 0.5);
-        const gr = W * 0.08;
-        const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, gr);
-        glow.addColorStop(0, "rgba(255,255,255," + (glowI * 0.15) + ")");
-        glow.addColorStop(0.3, "rgba(" + cr + "," + cg + "," + cb + "," + (glowI * 0.08) + ")");
-        glow.addColorStop(1, "rgba(0,0,0,0)");
-        ctx.fillStyle = glow;
-        ctx.fillRect(cx - gr, cy - gr, gr * 2, gr * 2);
+      // === LATERAL PASSING OBJECTS — bright shapes sweeping across from sides ===
+      if (speed > 0.5 && p > 0.15 && p < 0.75) {
+        const passI = Math.min(1, (p - 0.15) / 0.1);
+        for (let i = 0; i < 3; i++) {
+          const t = (phaseT * (0.4 + i * 0.15) + hash(i * 97) * 10) % 3;
+          if (t > 1) continue;
+          const side = hash(i * 53) > 0.5 ? 1 : -1;
+          const px = side * (W * 0.55 - t * W * 0.3);
+          const py = (hash(i * 31) - 0.5) * H * 0.6;
+          const sz = 3 + (1 - t) * 15;
+          const a = passI * (1 - t) * 0.4;
+          const g = ctx.createRadialGradient(cx + px, cy + py, 0, cx + px, cy + py, sz);
+          g.addColorStop(0, "rgba(255,255,255," + (a * 0.6) + ")");
+          g.addColorStop(0.4, "rgba(" + cr + "," + cg + "," + cb + "," + (a * 0.3) + ")");
+          g.addColorStop(1, "rgba(0,0,0,0)");
+          ctx.fillStyle = g;
+          ctx.fillRect(cx + px - sz, cy + py - sz, sz * 2, sz * 2);
+        }
       }
 
-      // === VOLUMETRIC LIGHT FOG — layers of colored mist rushing past ===
-      if (p > 0.12 && p < 0.78) {
-        const fogI = Math.min(1, (p - 0.12) / 0.08) * (p < 0.7 ? 1 : Math.max(0, (0.78 - p) / 0.08));
-        for (let i = 0; i < 3; i++) {
-          const fAng = phaseT * 0.3 + i * 2.1;
-          const fDist = W * 0.25 + Math.sin(fAng * 0.7) * W * 0.15;
+      // === VOLUMETRIC FOG — drifting color bands ===
+      if (p > 0.1 && p < 0.78) {
+        const fogI = Math.min(1, (p - 0.1) / 0.08) * (p < 0.7 ? 1 : Math.max(0, (0.78 - p) / 0.08));
+        for (let i = 0; i < 4; i++) {
+          const fAng = phaseT * 0.25 + i * 1.57;
+          const fDist = W * 0.2 + Math.sin(fAng * 0.5 + i) * W * 0.18;
           const fx = cx + Math.cos(fAng) * fDist;
           const fy = cy + Math.sin(fAng) * fDist;
-          const fr = W * 0.3;
+          const fr = W * 0.25 + i * 30;
           const fGrad = ctx.createRadialGradient(fx, fy, 0, fx, fy, fr);
-          fGrad.addColorStop(0, "rgba(" + Math.floor(cr * 0.5) + "," + Math.floor(cg * 0.5) + "," + Math.floor(cb * 0.7) + "," + (fogI * 0.04) + ")");
+          const fHue = (i * 0.25 + p * 0.5) % 1;
+          const fcr = Math.floor(cr * (0.4 + fHue * 0.3));
+          const fcg = Math.floor(cg * (0.3 + fHue * 0.4));
+          const fcb = Math.floor(cb * (0.5 + fHue * 0.3));
+          fGrad.addColorStop(0, "rgba(" + fcr + "," + fcg + "," + fcb + "," + (fogI * 0.05) + ")");
           fGrad.addColorStop(1, "rgba(0,0,0,0)");
           ctx.fillStyle = fGrad;
           ctx.fillRect(fx - fr, fy - fr, fr * 2, fr * 2);
         }
       }
 
-      // === CHROMATIC EDGES — color fringing at screen borders ===
-      if (speed > 0.3) {
-        const edgeI = Math.min(1, (speed - 0.3) / 0.5) * 0.12;
-        ctx.fillStyle = "rgba(" + cr + ",0," + cb + "," + edgeI + ")";
-        ctx.fillRect(0, 0, 3, H);
-        ctx.fillRect(W - 3, 0, 3, H);
-        ctx.fillStyle = "rgba(0," + cg + "," + cb + "," + edgeI + ")";
-        ctx.fillRect(0, 0, W, 3);
-        ctx.fillRect(0, H - 3, W, 3);
+      // === CENTRAL GLOW ===
+      if (speed > 0.15) {
+        const glowI = Math.min(1, speed / 0.8);
+        const gr = W * 0.06;
+        const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, gr);
+        glow.addColorStop(0, "rgba(255,255,255," + (glowI * 0.12) + ")");
+        glow.addColorStop(0.4, "rgba(" + cr + "," + cg + "," + cb + "," + (glowI * 0.06) + ")");
+        glow.addColorStop(1, "rgba(0,0,0,0)");
+        ctx.fillStyle = glow;
+        ctx.fillRect(cx - gr, cy - gr, gr * 2, gr * 2);
       }
 
-      // === VIGNETTE — tight tunnel feel ===
-      const vigR = diag * (0.55 - speed * 0.12);
-      const vig = ctx.createRadialGradient(cx, cy, vigR * 0.3, cx, cy, vigR);
+      // === VIGNETTE ===
+      const vigR = diag * (0.5 - speed * 0.1);
+      const vig = ctx.createRadialGradient(cx, cy, vigR * 0.25, cx, cy, vigR);
       vig.addColorStop(0, "rgba(0,0,0,0)");
-      vig.addColorStop(0.7, "rgba(0,0,0," + (0.2 + speed * 0.25) + ")");
-      vig.addColorStop(1, "rgba(0,0,0," + (0.6 + speed * 0.3) + ")");
+      vig.addColorStop(0.6, "rgba(0,0,0," + (0.15 + speed * 0.2) + ")");
+      vig.addColorStop(1, "rgba(0,0,0," + (0.55 + speed * 0.35) + ")");
       ctx.fillStyle = vig;
       ctx.fillRect(0, 0, W, H);
 
-      // === MARS APPROACH — warmth filling the view ===
+      // === MARS APPROACH ===
       if (p > 0.8) {
         const mp = (p - 0.8) / 0.2;
         const mr = mp * mp * Math.min(W, H) * 0.9;
@@ -1389,7 +1423,6 @@
         ctx.fillStyle = mGrad;
         ctx.beginPath(); ctx.arc(cx, cy, mr, 0, Math.PI * 2); ctx.fill();
       }
-
 
       if (phaseT >= dur && !fadeCallback) fadeTo("crash");
     }
@@ -1626,69 +1659,99 @@
         ctx.beginPath(); ctx.arc(ex - earthR * 0.25, ey - earthR * 0.25, earthR * 0.45, 0, 6.28); ctx.fill();
       }
 
-      // --- ASTRONAUT (3rd person silhouette, center-bottom) ---
+      // --- ASTRONAUT (3rd person, backlit silhouette with rim light) ---
       const ax = cx + P.x;
-      const ay = cy + H * 0.18 + P.y;
-      const aSize = Math.min(W, H) * 0.04;
+      const ay = cy + H * 0.2 + P.y;
+      const S = Math.min(W, H) * 0.028;
 
       ctx.save();
       ctx.translate(ax, ay);
-      ctx.rotate(P.tilt * 0.02 + Math.sin(P.tumble) * 0.03);
+      ctx.rotate(P.tilt * 0.015 + Math.sin(P.tumble) * 0.025);
 
-      // suit glow (subtle backlight from space)
-      const suitGlow = ctx.createRadialGradient(0, 0, aSize * 0.3, 0, 0, aSize * 2.5);
-      suitGlow.addColorStop(0, "rgba(100,140,200,0.04)");
-      suitGlow.addColorStop(1, "rgba(60,100,160,0)");
-      ctx.fillStyle = suitGlow;
-      ctx.fillRect(-aSize * 2.5, -aSize * 2.5, aSize * 5, aSize * 5);
+      const breathe = Math.sin(phaseT * 1.2) * 0.02;
+      const armFloat = Math.sin(phaseT * 0.6) * 0.12;
+      const legFloat = Math.sin(phaseT * 0.4 + 1) * 0.08;
 
-      // body
-      ctx.fillStyle = "rgba(15,15,20,0.9)";
+      // rim-light glow (backlit by distant star)
+      const rimGlow = ctx.createRadialGradient(0, -S, S * 0.8, 0, -S * 0.5, S * 4);
+      rimGlow.addColorStop(0, "rgba(140,170,220,0.06)");
+      rimGlow.addColorStop(0.5, "rgba(80,110,170,0.02)");
+      rimGlow.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = rimGlow;
+      ctx.fillRect(-S * 4, -S * 5, S * 8, S * 10);
+
+      // build silhouette path (all one continuous shape)
       ctx.beginPath();
-      ctx.ellipse(0, aSize * 0.2, aSize * 0.35, aSize * 0.6, 0, 0, Math.PI * 2);
+
+      // helmet (rounded top)
+      ctx.arc(0, -S * 2.6, S * 0.85, -Math.PI * 0.85, -Math.PI * 0.15);
+
+      // right shoulder & arm
+      ctx.bezierCurveTo(S * 0.9, -S * 2.0, S * 0.75, -S * 1.4, S * 0.6, -S * 0.8);
+      // right arm floating outward
+      ctx.bezierCurveTo(S * 0.95, -S * 1.2 - armFloat * S, S * 1.3, -S * 1.8 - armFloat * S * 0.5, S * 1.2, -S * 2.2 - armFloat * S);
+
+      // right hand (small bump)
+      ctx.bezierCurveTo(S * 1.25, -S * 2.35 - armFloat * S, S * 1.15, -S * 2.4 - armFloat * S, S * 1.1, -S * 2.2 - armFloat * S);
+
+      // back to right torso
+      ctx.bezierCurveTo(S * 0.9, -S * 1.6 - armFloat * S * 0.3, S * 0.7, -S * 0.6, S * 0.55, S * 0.2);
+
+      // right hip to right leg
+      ctx.bezierCurveTo(S * 0.55, S * 0.8, S * 0.5 + legFloat * S * 0.3, S * 1.6, S * 0.45 + legFloat * S * 0.4, S * 2.6 + legFloat * S);
+
+      // right boot
+      ctx.bezierCurveTo(S * 0.5 + legFloat * S * 0.4, S * 2.9 + legFloat * S, S * 0.3 + legFloat * S * 0.3, S * 2.95 + legFloat * S, S * 0.2 + legFloat * S * 0.2, S * 2.8 + legFloat * S * 0.8);
+
+      // crotch
+      ctx.bezierCurveTo(S * 0.1, S * 2.0, -S * 0.1, S * 2.0, -S * 0.2 - legFloat * S * 0.15, S * 2.7 - legFloat * S * 0.3);
+
+      // left boot
+      ctx.bezierCurveTo(-S * 0.3 - legFloat * S * 0.2, S * 2.9 - legFloat * S * 0.3, -S * 0.5 - legFloat * S * 0.2, S * 2.85 - legFloat * S * 0.2, -S * 0.45 - legFloat * S * 0.3, S * 2.5 - legFloat * S * 0.5);
+
+      // left leg back up
+      ctx.bezierCurveTo(-S * 0.5 - legFloat * S * 0.2, S * 1.5, -S * 0.55, S * 0.8, -S * 0.55, S * 0.2);
+
+      // left torso to left arm
+      ctx.bezierCurveTo(-S * 0.7, -S * 0.6, -S * 0.85, -S * 1.5 + armFloat * S * 0.3, -S * 1.05, -S * 2.0 + armFloat * S * 0.6);
+
+      // left hand
+      ctx.bezierCurveTo(-S * 1.2, -S * 2.3 + armFloat * S * 0.5, -S * 1.25, -S * 2.4 + armFloat * S * 0.4, -S * 1.15, -S * 2.3 + armFloat * S * 0.5);
+
+      // left arm back to shoulder
+      ctx.bezierCurveTo(-S * 0.95, -S * 1.8 + armFloat * S * 0.2, -S * 0.8, -S * 1.4, -S * 0.7, -S * 1.8);
+
+      // left shoulder to helmet
+      ctx.bezierCurveTo(-S * 0.75, -S * 2.0, -S * 0.85, -S * 2.4, -S * 0.6, -S * 2.9);
+
+      ctx.closePath();
+
+      // fill silhouette
+      ctx.fillStyle = "rgba(8,8,12,0.92)";
       ctx.fill();
 
-      // helmet
-      ctx.fillStyle = "rgba(20,22,28,0.95)";
+      // rim light edge (stroke the silhouette with thin bright line)
+      ctx.strokeStyle = "rgba(120,150,200,0.2)";
+      ctx.lineWidth = S * 0.06;
+      ctx.stroke();
+
+      // visor (golden reflection)
       ctx.beginPath();
-      ctx.arc(0, -aSize * 0.5, aSize * 0.32, 0, Math.PI * 2);
+      ctx.ellipse(S * 0.05, -S * 2.6, S * 0.5, S * 0.42, 0.05, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(8,8,12,0.95)";
+      ctx.fill();
+      const visorGrad = ctx.createLinearGradient(-S * 0.4, -S * 2.9, S * 0.4, -S * 2.3);
+      visorGrad.addColorStop(0, "rgba(60,90,140,0.25)");
+      visorGrad.addColorStop(0.5, "rgba(100,140,190,0.15)");
+      visorGrad.addColorStop(1, "rgba(50,70,110,0.05)");
+      ctx.fillStyle = visorGrad;
       ctx.fill();
 
-      // visor reflection
-      ctx.fillStyle = "rgba(80,120,180,0.3)";
+      // backpack (subtle bump behind)
       ctx.beginPath();
-      ctx.arc(aSize * 0.05, -aSize * 0.52, aSize * 0.18, 0, Math.PI * 2);
+      ctx.ellipse(-S * 0.6 + breathe * S, -S * 1.2, S * 0.3, S * 0.8, -0.1, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(5,5,8,0.7)";
       ctx.fill();
-
-      // backpack
-      ctx.fillStyle = "rgba(10,10,14,0.85)";
-      ctx.fillRect(-aSize * 0.2, -aSize * 0.3, -aSize * 0.2, aSize * 0.7);
-
-      // arms (floating pose)
-      const armWave = Math.sin(phaseT * 0.8) * 0.15;
-      ctx.strokeStyle = "rgba(15,15,20,0.85)";
-      ctx.lineWidth = aSize * 0.12;
-      ctx.lineCap = "round";
-      // left arm
-      ctx.beginPath();
-      ctx.moveTo(-aSize * 0.3, -aSize * 0.1);
-      ctx.quadraticCurveTo(-aSize * 0.6, -aSize * 0.3 + armWave * aSize, -aSize * 0.55, -aSize * 0.5 + armWave * aSize);
-      ctx.stroke();
-      // right arm
-      ctx.beginPath();
-      ctx.moveTo(aSize * 0.3, -aSize * 0.1);
-      ctx.quadraticCurveTo(aSize * 0.6, -aSize * 0.2 - armWave * aSize, aSize * 0.5, -aSize * 0.4 - armWave * aSize);
-      ctx.stroke();
-
-      // legs (relaxed float)
-      ctx.beginPath();
-      ctx.moveTo(-aSize * 0.12, aSize * 0.7);
-      ctx.quadraticCurveTo(-aSize * 0.2, aSize * 1.0, -aSize * 0.25, aSize * 1.2);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(aSize * 0.12, aSize * 0.7);
-      ctx.quadraticCurveTo(aSize * 0.15, aSize * 1.0, aSize * 0.1, aSize * 1.15);
-      ctx.stroke();
 
       ctx.restore();
 
