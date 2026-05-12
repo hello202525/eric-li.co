@@ -2890,162 +2890,41 @@ void main(){
       }
     }
 
-    // ======== ENDING: Earth with wispy clouds ========
+    // ======== ENDING: simple and clean ========
     let endingT = 0;
     const welcomeText = "Welcome home.";
     let welcomeRevealed = 0;
     let lastRevealT = 0;
-    const endStars = [];
-    for (let i = 0; i < 90; i++) endStars.push({
-      x: Math.random(), y: Math.random() * 0.85,
-      r: 0.3 + Math.random() * 0.6, b: 0.3 + Math.random() * 0.7,
-    });
-    // smoke cloud layer — rendered to offscreen canvas with blur
-    const smokeCanvas = document.createElement("canvas");
-    const smokeCtx = smokeCanvas.getContext("2d");
-    const smokePuffs = [];
-    for (let i = 0; i < 60; i++) {
-      smokePuffs.push({
-        x: Math.random(),
-        y: 0.2 + Math.random() * 0.6,
-        r: 0.04 + Math.random() * 0.1,
-        a: 0.3 + Math.random() * 0.5,
-        dx: (Math.random() - 0.5) * 0.01,
-        dy: (Math.random() - 0.5) * 0.005,
-        phase: Math.random() * 6.28,
-      });
-    }
 
     function drawEnding(dt) {
       endingT += dt;
       const t = endingT;
 
-      // phase 1: space → Earth approach (0-3s)
-      if (t < 3) {
-        const p = t / 3;
-        ctx.fillStyle = "#000";
-        ctx.fillRect(0, 0, W, H);
-
-        // fading stars
-        const starA = Math.max(0, 1 - p * 1.8);
-        if (starA > 0) {
-          for (const s of endStars) {
-            ctx.fillStyle = "rgba(200,215,235," + (s.b * starA) + ")";
-            ctx.beginPath(); ctx.arc(s.x * W, s.y * H, s.r, 0, 6.28); ctx.fill();
-          }
-        }
-
-        // Earth sphere grows from dot
-        const earthCx = W * 0.5;
-        const earthCy = H * 0.55;
-        const maxR = Math.min(W, H) * 0.35;
-        const earthR = 2 + Math.pow(p, 2.2) * maxR;
-        const earthA = Math.min(1, p * 2.5);
-
-        // atmospheric halo
-        if (earthR > 4) {
-          const hR = earthR * 1.4;
-          const halo = ctx.createRadialGradient(earthCx, earthCy, earthR * 0.85, earthCx, earthCy, hR);
-          halo.addColorStop(0, "rgba(140,190,255," + (earthA * 0.2) + ")");
-          halo.addColorStop(0.6, "rgba(100,160,230," + (earthA * 0.08) + ")");
-          halo.addColorStop(1, "rgba(60,100,180,0)");
-          ctx.fillStyle = halo;
-          ctx.beginPath(); ctx.arc(earthCx, earthCy, hR, 0, 6.28); ctx.fill();
-        }
-
-        // planet body
-        ctx.save();
-        ctx.beginPath();
-        ctx.arc(earthCx, earthCy, earthR, 0, 6.28);
-        ctx.clip();
-
-        // deep ocean gradient
-        const oGrad = ctx.createRadialGradient(
-          earthCx - earthR * 0.25, earthCy - earthR * 0.25, 0,
-          earthCx, earthCy, earthR
-        );
-        oGrad.addColorStop(0, "rgba(90,155,220," + earthA + ")");
-        oGrad.addColorStop(0.35, "rgba(55,120,190," + earthA + ")");
-        oGrad.addColorStop(0.65, "rgba(30,80,155," + earthA + ")");
-        oGrad.addColorStop(1, "rgba(12,35,80," + earthA + ")");
-        ctx.fillStyle = oGrad;
-        ctx.fillRect(earthCx - earthR, earthCy - earthR, earthR * 2, earthR * 2);
-
-        // smoky clouds — paint blobs to offscreen canvas, blur, composite
-        if (earthR > 25) {
-          const cloudA = earthA * Math.min(1, (earthR - 25) / 40);
-          const sz = Math.ceil(earthR * 2);
-          smokeCanvas.width = sz;
-          smokeCanvas.height = sz;
-          smokeCtx.clearRect(0, 0, sz, sz);
-          smokeCtx.filter = "blur(" + Math.max(3, earthR * 0.08) + "px)";
-          const drift = t * 0.015;
-          for (const p of smokePuffs) {
-            const px = ((p.x + drift * p.dx + Math.sin(t * 0.2 + p.phase) * 0.02) % 1.0 + 1) % 1.0;
-            const py = p.y + Math.sin(t * 0.15 + p.phase * 2) * 0.03;
-            const breath = 0.7 + 0.3 * Math.sin(t * 0.4 + p.phase);
-            smokeCtx.fillStyle = "rgba(255,255,255," + (p.a * breath * cloudA) + ")";
-            smokeCtx.beginPath();
-            smokeCtx.arc(px * sz, py * sz, p.r * sz, 0, 6.28);
-            smokeCtx.fill();
-          }
-          smokeCtx.filter = "none";
-          ctx.drawImage(smokeCanvas, earthCx - earthR, earthCy - earthR, sz, sz);
-        }
-
-        // spherical shading (lit from upper-left, dark limb)
-        const shade = ctx.createRadialGradient(
-          earthCx - earthR * 0.3, earthCy - earthR * 0.3, 0,
-          earthCx, earthCy, earthR
-        );
-        shade.addColorStop(0, "rgba(255,255,255,0.06)");
-        shade.addColorStop(0.3, "rgba(0,0,0,0)");
-        shade.addColorStop(0.75, "rgba(0,0,20,0.2)");
-        shade.addColorStop(1, "rgba(0,0,10,0.45)");
-        ctx.fillStyle = shade;
-        ctx.fillRect(earthCx - earthR, earthCy - earthR, earthR * 2, earthR * 2);
-
-        ctx.restore();
-
-        // warm light bloom as atmosphere engulfs view (last 30% of phase)
-        if (p > 0.7) {
-          const bp = (p - 0.7) / 0.3;
-          const bR = earthR + bp * Math.max(W, H) * 0.5;
-          const bloom = ctx.createRadialGradient(earthCx, earthCy, earthR * 0.5, earthCx, earthCy, bR);
-          bloom.addColorStop(0, "rgba(220,235,250," + (bp * bp * 0.8) + ")");
-          bloom.addColorStop(0.4, "rgba(200,220,245," + (bp * bp * 0.5) + ")");
-          bloom.addColorStop(0.7, "rgba(180,210,240," + (bp * bp * 0.25) + ")");
-          bloom.addColorStop(1, "rgba(160,195,230,0)");
-          ctx.fillStyle = bloom;
-          ctx.fillRect(0, 0, W, H);
-        }
-      }
-      // phase 2: atmosphere → soft sky-white (3-4.5s)
-      else if (t < 4.5) {
-        const p = (t - 3) / 1.5;
-        // white with a gentle sky-blue tint
-        const r = Math.floor(235 + p * 10);
-        const g = Math.floor(242 + p * 6);
-        const b = Math.floor(248 + p * 4);
-        ctx.fillStyle = "rgb(" + Math.min(245, r) + "," + Math.min(248, g) + "," + Math.min(252, b) + ")";
+      // phase 1: white wash settles to sky-white (0-1.5s)
+      if (t < 1.5) {
+        const p = t / 1.5;
+        const r = Math.floor(255 - p * 10);
+        const g = Math.floor(255 - p * 7);
+        const b = Math.floor(255 - p * 3);
+        ctx.fillStyle = "rgb(" + r + "," + g + "," + b + ")";
         ctx.fillRect(0, 0, W, H);
       }
-      // phase 3: hold sky-white (4.5-6s)
+      // phase 2: hold sky-white (1.5-4.5s)
       else {
         ctx.fillStyle = "rgb(245,248,252)";
         ctx.fillRect(0, 0, W, H);
       }
 
-      // typewriter text (starts at 3.5s)
-      if (t > 3.5 && welcomeRevealed < welcomeText.length) {
+      // typewriter text (starts at 1.2s)
+      if (t > 1.2 && welcomeRevealed < welcomeText.length) {
         if (t - lastRevealT > 0.09) {
           welcomeRevealed++;
           lastRevealT = t;
         }
       }
 
-      // text: fade in at 3.5, hold, fade out at 5.3
-      const textFade = t < 3.5 ? 0 : t < 3.8 ? (t - 3.5) / 0.3 : t < 5.3 ? 1 : Math.max(0, 1 - (t - 5.3) / 0.5);
+      // text: fade in at 1.2, hold, fade out at 3.8
+      const textFade = t < 1.2 ? 0 : t < 1.5 ? (t - 1.2) / 0.3 : t < 3.8 ? 1 : Math.max(0, 1 - (t - 3.8) / 0.5);
       if (welcomeRevealed > 0 && textFade > 0.01) {
         ctx.save();
         ctx.textAlign = "center";
@@ -3056,7 +2935,7 @@ void main(){
         ctx.restore();
       }
 
-      if (t > 6.0) clearWidget();
+      if (t > 4.5) clearWidget();
     }
 
     function frame(now) {
