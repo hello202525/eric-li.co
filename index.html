@@ -1058,13 +1058,13 @@
     let rY = H * 0.65, rVel = 0, rRot = 0;
     const exhaust = [];
     const bgStars = [];
-    for (let i = 0; i < 500; i++) bgStars.push({
+    for (let i = 0; i < 2000; i++) bgStars.push({
       x: hash(i * 7) * W,
       y: hash(i * 13) * H,
-      r: 0.2 + Math.pow(hash(i + 500), 2) * 1.2,
-      b: 0.15 + hash(i + 250) * 0.7,
+      r: 0.1 + Math.pow(hash(i + 500), 3) * 1.4,
+      b: 0.1 + hash(i + 250) * 0.8,
       tw: hash(i + 777) * 6.28,
-      twSpd: 0.2 + hash(i + 333) * 1.5,
+      twSpd: 0.15 + hash(i + 333) * 1.8,
     });
 
     // ===== WARP STATE =====
