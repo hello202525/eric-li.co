@@ -677,25 +677,25 @@
       let anyAlive = false;
 
       for (const b of birds) {
-        if (!birdsDying && b.alpha > 0) {
-          b.x += b.vx;
-          b.y += b.vy + Math.sin(b.wingPhase * 0.3) * 0.3;
-          b.wingPhase += b.wingSpeed * 0.06;
+        // always keep moving
+        b.x += b.vx;
+        b.y += b.vy + Math.sin(b.wingPhase * 0.3) * 0.3;
+        b.wingPhase += b.wingSpeed * 0.06;
 
-          // bird: thin elegant arc — like a distant swallow
-          const wing = Math.sin(b.wingPhase) * 0.7;
+        if (birdsDying) b.alpha = Math.max(0, b.alpha - 0.08);
+
+        if (b.alpha > 0.01) {
+          const wing = Math.sin(b.wingPhase) * (birdsDying ? 0.3 : 0.7);
           const w = b.size;
           birdCtx.save();
           birdCtx.translate(b.x, b.y);
           birdCtx.strokeStyle = "rgba(25,25,30," + b.alpha + ")";
           birdCtx.lineWidth = 1;
           birdCtx.lineCap = "round";
-          // left wing
           birdCtx.beginPath();
           birdCtx.moveTo(0, 0);
           birdCtx.quadraticCurveTo(-w * 0.4, -wing * w * 0.4, -w, -wing * w * 0.25);
           birdCtx.stroke();
-          // right wing
           birdCtx.beginPath();
           birdCtx.moveTo(0, 0);
           birdCtx.quadraticCurveTo(w * 0.4, -wing * w * 0.4, w, -wing * w * 0.25);
@@ -705,26 +705,6 @@
         }
 
         if (birdsDying) {
-          b.alpha = Math.max(0, b.alpha - 0.06);
-          // fading bird
-          if (b.alpha > 0.01) {
-            const wing = Math.sin(b.wingPhase) * 0.3;
-            const w = b.size;
-            birdCtx.save();
-            birdCtx.translate(b.x, b.y);
-            birdCtx.strokeStyle = "rgba(25,25,30," + b.alpha + ")";
-            birdCtx.lineWidth = 1;
-            birdCtx.lineCap = "round";
-            birdCtx.beginPath();
-            birdCtx.moveTo(0, 0);
-            birdCtx.quadraticCurveTo(-w * 0.4, -wing * w * 0.4, -w, -wing * w * 0.25);
-            birdCtx.stroke();
-            birdCtx.beginPath();
-            birdCtx.moveTo(0, 0);
-            birdCtx.quadraticCurveTo(w * 0.4, -wing * w * 0.4, w, -wing * w * 0.25);
-            birdCtx.stroke();
-            birdCtx.restore();
-          }
           // dust particles
           for (const d of b.dust) {
             if (d.alpha <= 0) continue;
