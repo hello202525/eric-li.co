@@ -1543,8 +1543,8 @@
       if (ended) return;
 
       // drift forward always
-      const baseSpd = 1.0;
-      const boost = (keys["ArrowUp"] || keys["KeyW"]) ? 1.8 : 1;
+      const baseSpd = 1.2;
+      const boost = (keys["ArrowUp"] || keys["KeyW"]) ? 1.6 : 1;
       driftZ += dt * baseSpd * boost;
 
       // gentle lateral/vertical drift controls
@@ -1800,6 +1800,15 @@
       if (phaseT < 2.5) {
         ctx.fillStyle = "rgba(0,0,0," + (1 - phaseT / 2.5) + ")";
         ctx.fillRect(0, 0, W, H);
+      }
+
+      // subtle control hint
+      if (phaseT > 3 && phaseT < 8) {
+        const hintA = phaseT < 4 ? (phaseT - 3) * 0.12 : Math.max(0, (8 - phaseT) / 4) * 0.12;
+        ctx.fillStyle = "rgba(228,226,218," + hintA + ")";
+        ctx.font = "11px " + FONT;
+        ctx.textAlign = "center";
+        ctx.fillText("arrow keys to drift", cx, H - 40);
       }
 
       // ending: gentle white wash when approaching Earth
