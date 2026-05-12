@@ -1955,23 +1955,39 @@ void main(){
   gForce = min(gForce, 25.0);
   vel += normalize(delta + 0.0001) * gForce * u_dt;
 
-  // mouse injects energy
+  // mouse injects energy — dragging creates hot plasma trails
   float mouseDist = length(v_uv - u_mouse);
-  float mouseInject = exp(-mouseDist * mouseDist * 80.0) * u_gravity * 0.15;
+  float mouseInject = exp(-mouseDist * mouseDist * 50.0) * u_gravity * 0.25;
   vec2 mouseVel = u_mouse - u_mousePrev;
   float mSpeed = length(mouseVel);
-  density += mouseInject * (0.1 + mSpeed * 2.0);
-  temp += mouseInject * (0.2 + mSpeed * 3.0);
-  if(mSpeed > 0.001) vel += normalize(mouseVel) * mouseInject * 2.0;
+  density += mouseInject * (0.2 + mSpeed * 4.0);
+  temp += mouseInject * (0.4 + mSpeed * 6.0);
+  // drag creates swirling vortex around cursor
+  if(mSpeed > 0.001) {
+    vel += normalize(mouseVel) * mouseInject * 3.5;
+    vec2 toMouse = v_uv - u_mouse;
+    vec2 swirlDir = vec2(-toMouse.y, toMouse.x);
+    float swirlStr = exp(-mouseDist * mouseDist * 30.0) * mSpeed * 8.0;
+    vel += swirlDir * swirlStr;
+  }
+  // proximity heat — cursor radiates warmth even when still
+  temp += exp(-mouseDist * mouseDist * 120.0) * 0.003;
 
-  // click shockwave
+  // click: violent shockwave — expanding ring + core collapse + temperature eruption
   if(u_impulse > 0.05){
     float impR = length(v_uv - u_mouse);
-    float impStr = u_impulse * exp(-impR * impR * 8.0) * 6.0;
+    // expanding ring blast
+    float ringDist = abs(impR - (1.0 - u_impulse) * 0.25);
+    float ringStr = u_impulse * exp(-ringDist * ringDist * 800.0) * 12.0;
     vec2 impDir = normalize(v_uv - u_mouse + 0.0001);
-    vel += impDir * impStr;
-    temp += impStr * 0.6;
-    density += impStr * 0.3;
+    vel += impDir * ringStr;
+    // core collapse (pulls everything inward after initial blast)
+    float coreStr = u_impulse * exp(-impR * impR * 20.0) * 8.0;
+    vel -= impDir * coreStr * 0.4;
+    // massive temperature eruption
+    float heatStr = u_impulse * exp(-impR * impR * 12.0) * 15.0;
+    temp += heatStr;
+    density += heatStr * 0.5;
   }
 
   // advection
@@ -2328,7 +2344,7 @@ void main(){
       return {
         gl, simProg, dispProg, fboA, fboB, sW, sH, cW, cH,
         simLocs, dispLocs, bindAttrib, vbuf,
-        getGrav() { return mouseDown ? 8.0 : (0.5 + mouseSpeed * 40.0); },
+        getGrav() { return mouseDown ? 14.0 : (0.8 + mouseSpeed * 60.0); },
         getImp() {
           const v = impulseFrames > 0 ? (impulseFrames / 15.0) : 0.0;
           if (impulseFrames > 0) impulseFrames--;
