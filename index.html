@@ -370,9 +370,9 @@
       $home.hidden = false;
       [$work, $gallery].forEach(el => {
         el.style.transition = "";
-        el.classList.remove("show");
-        el.setAttribute("aria-hidden", "true");
-      });
+      el.classList.remove("show");
+      el.setAttribute("aria-hidden", "true");
+    });
       return;
     }
 
@@ -718,7 +718,7 @@
     $widgetCanvas.classList.remove("show");
     document.body.classList.remove("stars-mode", "void-mode", "mirror-mode", "play-mode");
     if (playCleanup) { playCleanup(); playCleanup = null; }
-    $widget.innerHTML = "";
+      $widget.innerHTML = "";
     if (mirrorStream) {
       mirrorStream.getTracks().forEach(t => t.stop());
       mirrorStream = null;
@@ -745,7 +745,7 @@
 
   function fireWidget(kind) {
     if (kind === activeWidget) return;
-    clearWidget();
+        clearWidget();
     document.body.style.background = "";
     document.body.classList.remove("enchanted");
     const bioEl = document.querySelector(".bio");
@@ -1474,15 +1474,18 @@
       if (phaseT >= dur && !fadeCallback) fadeTo("crash");
     }
 
-    // ======== CRASH (Gray-Scott reaction-diffusion on Mars impact) ========
+    // ======== CRASH (Fluid plasma planet — melty Mars) ========
     let crashGL = null;
     let crashCanvas = null;
 
     function initCrashGL() {
       crashCanvas = document.createElement("canvas");
-      crashCanvas.style.cssText = "position:fixed;inset:0;width:100%;height:100%;z-index:8;";
+      crashCanvas.style.cssText = "position:fixed;inset:0;width:100%;height:100%;z-index:8;cursor:crosshair;";
       document.body.appendChild(crashCanvas);
 
+      const simScale = 0.5;
+      const sW = Math.round(innerWidth * simScale);
+      const sH = Math.round(innerHeight * simScale);
       const dpr = Math.min(devicePixelRatio || 1, 2);
       const cW = Math.round(innerWidth * dpr);
       const cH = Math.round(innerHeight * dpr);
@@ -1492,81 +1495,272 @@
       const gl = crashCanvas.getContext("webgl2", { alpha: false, antialias: false, depth: false });
       if (!gl || !gl.getExtension("EXT_color_buffer_float")) return null;
 
+      const VERT = `#version 300 es
+in vec2 a_pos;
+out vec2 v_uv;
+void main(){ v_uv = a_pos * 0.5 + 0.5; gl_Position = vec4(a_pos, 0, 1); }`;
+
       const SIM_FRAG = `#version 300 es
 precision highp float;
 uniform sampler2D u_state;
 uniform vec2 u_res;
 uniform vec2 u_mouse;
-uniform float u_mouseDown;
-uniform float u_mouseSpeed;
+uniform vec2 u_mousePrev;
+uniform float u_gravity;
+uniform float u_impulse;
+uniform float u_dt;
 uniform float u_time;
+in vec2 v_uv;
 out vec4 fragColor;
-void main() {
+
+vec3 mod289(vec3 x){return x-floor(x*(1./289.))*289.;}
+vec4 mod289(vec4 x){return x-floor(x*(1./289.))*289.;}
+vec4 perm(vec4 x){return mod289(((x*34.)+1.)*x);}
+float noise3(vec3 p){
+  vec3 a=floor(p),d=p-a;
+  d=d*d*(3.-2.*d);
+  vec4 b=a.xxyy+vec4(0,1,0,1);
+  vec4 k1=perm(b.xyxy);
+  vec4 k2=perm(k1.xyxy+b.zzww);
+  vec4 c=k2+a.zzzz;
+  vec4 k3=perm(c);
+  vec4 k4=perm(c+1.);
+  vec4 o1=fract(k3*(1./41.));
+  vec4 o2=fract(k4*(1./41.));
+  vec4 o3=o2*d.z+o1*(1.-d.z);
+  vec2 o4=o3.yw*d.x+o3.xz*(1.-d.x);
+  return o4.y*d.y+o4.x*(1.-d.y);
+}
+float fbm(vec3 p){
+  float v=0.,a=0.5;
+  for(int i=0;i<5;i++){v+=a*noise3(p);p*=2.1;a*=0.5;}
+  return v;
+}
+
+void main(){
   vec2 px = 1.0 / u_res;
-  vec2 uv = gl_FragCoord.xy / u_res;
-  vec2 ctr = texture(u_state, uv).rg;
-  vec2 lap = -ctr;
-  lap += texture(u_state, uv + vec2( px.x, 0.0)).rg * 0.2;
-  lap += texture(u_state, uv + vec2(-px.x, 0.0)).rg * 0.2;
-  lap += texture(u_state, uv + vec2(0.0,  px.y)).rg * 0.2;
-  lap += texture(u_state, uv + vec2(0.0, -px.y)).rg * 0.2;
-  lap += texture(u_state, uv + vec2( px.x,  px.y)).rg * 0.05;
-  lap += texture(u_state, uv + vec2(-px.x,  px.y)).rg * 0.05;
-  lap += texture(u_state, uv + vec2( px.x, -px.y)).rg * 0.05;
-  lap += texture(u_state, uv + vec2(-px.x, -px.y)).rg * 0.05;
-  float A = ctr.r, B = ctr.g;
-  float phase = u_time * 0.015;
-  float f = 0.037 + sin(phase) * 0.006 + sin(phase * 1.7) * 0.003;
-  float k = 0.06 + cos(phase * 0.7) * 0.005 + cos(phase * 2.1) * 0.002;
-  float Da = 1.0, Db = 0.5, dt = 1.0;
-  float abb = A * B * B;
-  float newA = A + (Da * lap.r - abb + f * (1.0 - A)) * dt;
-  float newB = B + (Db * lap.g + abb - (k + f) * B) * dt;
-  vec2 mUV = u_mouse;
-  float dist = length(uv - mUV);
-  float seedR = mix(0.025, 0.008, clamp(u_mouseSpeed * 3.0, 0.0, 1.0));
-  float seed = smoothstep(seedR, seedR * 0.15, dist);
-  if (u_mouseDown > 0.5) {
-    float cs = smoothstep(0.05, 0.003, dist);
-    newB = min(newB + cs * 0.9 + seed * 0.4, 1.0);
-  } else if (u_mouseSpeed > 0.001) {
-    newB = min(newB + seed * 0.2, 1.0);
+  vec4 state = texture(u_state, v_uv);
+  vec2 vel = state.xy;
+  float density = state.z;
+  float temp = state.w;
+
+  // gravity toward planet center
+  vec2 delta = vec2(0.5) - v_uv;
+  float aspect = u_res.x / u_res.y;
+  delta.x *= aspect;
+  float r = length(delta);
+  float gForce = u_gravity / (r * r + 0.003);
+  gForce = min(gForce, 25.0);
+  vel += normalize(delta + 0.0001) * gForce * u_dt;
+
+  // mouse injects energy
+  float mouseDist = length(v_uv - u_mouse);
+  float mouseInject = exp(-mouseDist * mouseDist * 80.0) * u_gravity * 0.15;
+  vec2 mouseVel = u_mouse - u_mousePrev;
+  float mSpeed = length(mouseVel);
+  density += mouseInject * (0.1 + mSpeed * 2.0);
+  temp += mouseInject * (0.2 + mSpeed * 3.0);
+  if(mSpeed > 0.001) vel += normalize(mouseVel) * mouseInject * 2.0;
+
+  // click shockwave
+  if(u_impulse > 0.05){
+    float impR = length(v_uv - u_mouse);
+    float impStr = u_impulse * exp(-impR * impR * 8.0) * 6.0;
+    vec2 impDir = normalize(v_uv - u_mouse + 0.0001);
+    vel += impDir * impStr;
+    temp += impStr * 0.6;
+    density += impStr * 0.3;
   }
-  fragColor = vec4(clamp(newA, 0.0, 1.0), clamp(newB, 0.0, 1.0), 0.0, 1.0);
+
+  // advection
+  vec2 prevUV = v_uv - vel * u_dt * 0.5;
+  vec4 advected = texture(u_state, prevUV);
+
+  // 8-neighbor diffusion
+  vec4 L = texture(u_state, v_uv + vec2(-px.x, 0));
+  vec4 R = texture(u_state, v_uv + vec2( px.x, 0));
+  vec4 U = texture(u_state, v_uv + vec2(0,  px.y));
+  vec4 D = texture(u_state, v_uv + vec2(0, -px.y));
+  vec4 TL = texture(u_state, v_uv + vec2(-px.x, px.y));
+  vec4 TR = texture(u_state, v_uv + vec2( px.x, px.y));
+  vec4 BL = texture(u_state, v_uv + vec2(-px.x, -px.y));
+  vec4 BR = texture(u_state, v_uv + vec2( px.x, -px.y));
+  vec4 neighbors = (L + R + U + D) * 0.125 + (TL + TR + BL + BR) * 0.0625;
+  vec4 diffused = mix(advected, neighbors * (1.0/0.75), 0.35);
+
+  vel = diffused.xy;
+  density = diffused.z;
+  temp = diffused.w;
+
+  // pressure correction
+  float divR2 = R.x - L.x;
+  float divU2 = U.y - D.y;
+  vel -= vec2(divR2, divU2) * 0.15;
+
+  // curl noise for swirling
+  float nR = fbm(vec3((v_uv + vec2(px.x*2.0,0)) * 3.0, u_time * 0.15));
+  float nL2 = fbm(vec3((v_uv - vec2(px.x*2.0,0)) * 3.0, u_time * 0.15));
+  float nU = fbm(vec3((v_uv + vec2(0,px.y*2.0)) * 3.0, u_time * 0.15));
+  float nD2 = fbm(vec3((v_uv - vec2(0,px.y*2.0)) * 3.0, u_time * 0.15));
+  vec2 curl = vec2(nU - nD2, -(nR - nL2)) * 0.04;
+  vel += curl;
+
+  // large-scale slow drift
+  float s1 = fbm(vec3(v_uv * 1.5, u_time * 0.06)) - 0.5;
+  float s2 = fbm(vec3(v_uv.yx * 1.5, u_time * 0.06 + 10.0)) - 0.5;
+  vel += vec2(s1, s2) * 0.015;
+
+  // central energy source
+  float cDist = length(v_uv - vec2(0.5));
+  float feed = exp(-cDist * cDist * 18.0) * 0.003;
+  density += feed;
+  temp += feed * 0.4;
+
+  // drifting secondary hotspots
+  vec2 src2 = vec2(0.5 + sin(u_time*0.13)*0.18, 0.5 + cos(u_time*0.17)*0.14);
+  float d2 = length(v_uv - src2);
+  density += exp(-d2*d2 * 50.0) * 0.003;
+  temp += exp(-d2*d2 * 50.0) * 0.005;
+
+  vec2 src3 = vec2(0.5 + cos(u_time*0.11)*0.22, 0.5 + sin(u_time*0.19)*0.18);
+  float d3 = length(v_uv - src3);
+  density += exp(-d3*d3 * 50.0) * 0.002;
+
+  // buoyancy + lateral wind
+  vel.y += temp * 0.025;
+  vel.x += sin(v_uv.y * 6.28 + u_time * 0.3) * temp * 0.005;
+
+  // decay
+  vel *= 0.992;
+  density *= 0.996;
+  temp *= 0.97;
+
+  // circular planet boundary — hard kill outside planet radius
+  float fromCenter = length(v_uv - vec2(0.5));
+  float planetR = 0.35;
+  float boundFade = smoothstep(planetR, planetR * 0.5, fromCenter);
+  density *= mix(0.92, 1.0, boundFade);
+  temp *= mix(0.90, 1.0, boundFade);
+  vel *= mix(0.85, 1.0, boundFade);
+
+  fragColor = vec4(vel, max(density,0.0), max(temp,0.0));
 }`;
 
       const DISP_FRAG = `#version 300 es
 precision highp float;
 uniform sampler2D u_state;
 uniform vec2 u_res;
+uniform float u_time;
 uniform float u_fade;
+in vec2 v_uv;
 out vec4 fragColor;
-vec3 palette(float b) {
-  vec3 c0 = vec3(0.06, 0.02, 0.01);
-  vec3 c1 = vec3(0.25, 0.08, 0.03);
-  vec3 c2 = vec3(0.55, 0.22, 0.06);
-  vec3 c3 = vec3(0.80, 0.45, 0.12);
-  vec3 c4 = vec3(0.95, 0.85, 0.55);
-  float t = clamp(b * 2.8, 0.0, 1.0);
-  if (t < 0.2) return mix(c0, c1, t / 0.2);
-  if (t < 0.45) return mix(c1, c2, (t - 0.2) / 0.25);
-  if (t < 0.7) return mix(c2, c3, (t - 0.45) / 0.25);
-  return mix(c3, c4, (t - 0.7) / 0.3);
-}
-void main() {
-  vec2 uv = gl_FragCoord.xy / u_res;
-  float b = texture(u_state, uv).g;
-  vec3 col = palette(b);
-  vec2 vig = uv * (1.0 - uv);
-  float v = clamp(pow(vig.x * vig.y * 18.0, 0.35), 0.0, 1.0);
-  col *= mix(0.5, 1.0, v);
-  col *= u_fade;
-  fragColor = vec4(col, 1.0);
-}`;
 
-      const VERT = `#version 300 es
-in vec2 a_pos;
-void main() { gl_Position = vec4(a_pos, 0.0, 1.0); }`;
+vec3 marsColor(float t){
+  // deep reddish-brown -> rust -> orange -> amber -> pale gold
+  vec3 c0 = vec3(0.08, 0.02, 0.01);
+  vec3 c1 = vec3(0.35, 0.08, 0.02);
+  vec3 c2 = vec3(0.65, 0.18, 0.04);
+  vec3 c3 = vec3(0.85, 0.40, 0.10);
+  vec3 c4 = vec3(1.0, 0.80, 0.45);
+  t = clamp(t, 0.0, 1.0);
+  if(t < 0.25) return mix(c0, c1, t / 0.25);
+  if(t < 0.5) return mix(c1, c2, (t-0.25)/0.25);
+  if(t < 0.75) return mix(c2, c3, (t-0.5)/0.25);
+  return mix(c3, c4, (t-0.75)/0.25);
+}
+
+float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7)))*43758.5453); }
+float vnoise(vec2 p){
+  vec2 i=floor(p), f=fract(p);
+  f=f*f*(3.0-2.0*f);
+  return mix(mix(hash(i),hash(i+vec2(1,0)),f.x), mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x), f.y);
+}
+
+void main(){
+  vec2 uv = v_uv;
+  float aspect = u_res.x / u_res.y;
+  vec2 centered = uv - vec2(0.5);
+  centered.x *= aspect;
+  float dist = length(centered);
+  float planetR = 0.35 * min(aspect, 1.0);
+
+  // chromatic aberration toward edges
+  vec2 chromDir = normalize(centered + 0.0001) * 0.003 * smoothstep(planetR*0.5, planetR, dist);
+  vec4 stateR = texture(u_state, uv + chromDir);
+  vec4 stateG = texture(u_state, uv);
+  vec4 stateB = texture(u_state, uv - chromDir);
+
+  float emR = stateR.z * 0.8 + stateR.w * 1.5 + length(stateR.xy) * 0.4;
+  float emG = stateG.z * 0.8 + stateG.w * 1.5 + length(stateG.xy) * 0.4;
+  float emB = stateB.z * 0.8 + stateB.w * 1.5 + length(stateB.xy) * 0.4;
+
+  float tR = clamp(stateR.w * 2.0 + length(stateR.xy) * 0.3, 0.0, 1.0);
+  float tG = clamp(stateG.w * 2.0 + length(stateG.xy) * 0.3, 0.0, 1.0);
+  float tB = clamp(stateB.w * 2.0 + length(stateB.xy) * 0.3, 0.0, 1.0);
+
+  vec3 col;
+  col.r = marsColor(tR).r * emR;
+  col.g = marsColor(tG).g * emG;
+  col.b = marsColor(tB).b * emB;
+
+  // deep red in dense cool regions
+  float coolDense = stateG.z * (1.0 - clamp(stateG.w * 2.0, 0.0, 1.0));
+  col += vec3(0.25, 0.04, 0.01) * coolDense;
+
+  // bloom
+  vec2 px = 1.0 / u_res;
+  vec3 bloom = vec3(0.0);
+  for(int i = 1; i <= 6; i++){
+    float fi = float(i);
+    float w = 1.0 / (fi * 1.2 + 1.0);
+    float off = fi * 2.5;
+    vec4 sR2 = texture(u_state, uv + vec2(off*px.x, 0));
+    vec4 sL2 = texture(u_state, uv - vec2(off*px.x, 0));
+    vec4 sU2 = texture(u_state, uv + vec2(0, off*px.y));
+    vec4 sD2 = texture(u_state, uv - vec2(0, off*px.y));
+    bloom += marsColor(clamp(sR2.w*3.0,0.0,1.0)) * (sR2.z+sR2.w) * w;
+    bloom += marsColor(clamp(sL2.w*3.0,0.0,1.0)) * (sL2.z+sL2.w) * w;
+    bloom += marsColor(clamp(sU2.w*3.0,0.0,1.0)) * (sU2.z+sU2.w) * w;
+    bloom += marsColor(clamp(sD2.w*3.0,0.0,1.0)) * (sD2.z+sD2.w) * w;
+  }
+  col += bloom * 0.08;
+
+  // ACES tone mapping
+  col = (col * (2.51 * col + 0.03)) / (col * (2.43 * col + 0.59) + 0.14);
+  col = clamp(col, 0.0, 1.0);
+
+  // circular planet mask
+  float planetEdge = smoothstep(planetR, planetR - 0.008, dist);
+
+  // atmospheric rim glow
+  float rimGlow = smoothstep(planetR + 0.06, planetR - 0.02, dist) * (1.0 - smoothstep(planetR - 0.04, planetR - 0.12, dist));
+  vec3 rimCol = vec3(0.8, 0.25, 0.05) * rimGlow * 0.6;
+
+  // outer atmospheric haze
+  float outerHaze = smoothstep(planetR + 0.12, planetR, dist) * (1.0 - planetEdge);
+  vec3 hazeCol = vec3(0.4, 0.1, 0.02) * outerHaze * 0.3;
+
+  // subtle surface noise for rocky texture
+  float surfNoise = vnoise(v_uv * 30.0 + u_time * 0.02) * 0.1;
+
+  vec3 planet = col * planetEdge + rimCol + hazeCol;
+  planet += vec3(surfNoise * 0.03, surfNoise * 0.01, 0.0) * planetEdge;
+
+  // spherical shading — lit from upper-left
+  vec2 normPos = centered / planetR;
+  float shade = clamp(dot(normalize(vec3(normPos, sqrt(max(0.0, 1.0 - dot(normPos, normPos))))), normalize(vec3(-0.4, 0.5, 0.7))), 0.0, 1.0);
+  shade = mix(0.3, 1.0, shade);
+  planet *= mix(1.0, shade, planetEdge * 0.4);
+
+  // background: black with sparse stars
+  float bgStar = step(0.998, hash(floor(v_uv * 300.0))) * (0.3 + 0.7 * hash(floor(v_uv * 300.0 + 100.0)));
+  vec3 bg = vec3(bgStar * 0.6);
+
+  vec3 final = mix(bg, planet, planetEdge + outerHaze + rimGlow * 0.5);
+
+  final *= u_fade;
+  fragColor = vec4(final, 1.0);
+}`;
 
       function compile(src, type) {
         const s = gl.createShader(type);
@@ -1584,7 +1778,7 @@ void main() { gl_Position = vec4(a_pos, 0.0, 1.0); }`;
 
       const vbuf = gl.createBuffer();
       gl.bindBuffer(gl.ARRAY_BUFFER, vbuf);
-      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
 
       function bindAttrib(prog) {
         const loc = gl.getAttribLocation(prog, "a_pos");
@@ -1595,9 +1789,9 @@ void main() { gl_Position = vec4(a_pos, 0.0, 1.0); }`;
       function makeFBO(w, h) {
         const tex = gl.createTexture();
         gl.bindTexture(gl.TEXTURE_2D, tex);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, w, h, 0, gl.RGBA, gl.FLOAT, null);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, w, h, 0, gl.RGBA, gl.HALF_FLOAT, null);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
         const fbo = gl.createFramebuffer();
@@ -1606,67 +1800,75 @@ void main() { gl_Position = vec4(a_pos, 0.0, 1.0); }`;
         return { tex, fbo };
       }
 
-      const simW = cW, simH = cH;
-      let fboA = makeFBO(simW, simH);
-      let fboB = makeFBO(simW, simH);
+      let fboA = makeFBO(sW, sH);
+      let fboB = makeFBO(sW, sH);
 
-      // seed: A=1 everywhere, B=0, with radial burst of B from center
-      const init = new Float32Array(simW * simH * 4);
-      for (let i = 0; i < simW * simH; i++) { init[i * 4] = 1.0; init[i * 4 + 3] = 1.0; }
-      const cx = simW / 2, cy = simH / 2;
-      for (let ring = 0; ring < 20; ring++) {
-        const r = 5 + ring * (Math.min(simW, simH) * 0.012);
-        const pts = Math.floor(12 + ring * 4);
-        for (let p = 0; p < pts; p++) {
-          const ang = (p / pts) * Math.PI * 2 + ring * 0.3;
-          const bx = cx + Math.cos(ang) * r + (Math.random() - 0.5) * 6;
-          const by = cy + Math.sin(ang) * r + (Math.random() - 0.5) * 6;
-          const sr = 2 + Math.random() * 4;
-          for (let dy = -sr; dy <= sr; dy++) {
-            for (let dx = -sr; dx <= sr; dx++) {
-              if (dx * dx + dy * dy > sr * sr) continue;
-              const ix = Math.round(bx + dx), iy = Math.round(by + dy);
-              if (ix < 0 || ix >= simW || iy < 0 || iy >= simH) continue;
-              init[(iy * simW + ix) * 4 + 1] = 1.0;
-            }
-          }
+      // seed: nebular density with radial falloff (impact burst)
+      const initData = new Float32Array(sW * sH * 4);
+      for (let y = 0; y < sH; y++) {
+        for (let x = 0; x < sW; x++) {
+          const idx = (y * sW + x) * 4;
+          const u = x / sW, v = y / sH;
+          const cx2 = u - 0.5, cy2 = v - 0.5;
+          const dd = Math.sqrt(cx2*cx2 + cy2*cy2);
+          const falloff = Math.exp(-dd * dd * 12);
+          const n1 = Math.sin(u*17.3 + v*13.7) * Math.cos(u*23.1 - v*7.3);
+          const n2 = Math.sin(u*31.1 + v*29.3 + 1.7) * Math.cos(u*11.3 + v*19.1);
+          const n3 = Math.sin(u*43.7 - v*37.3 + 3.1) * Math.cos(u*53.1 + v*41.7);
+          const dens = (0.3 + 0.5 * Math.abs(n1 + n2 * 0.5 + n3 * 0.25)) * falloff;
+          const tmp = dens * 0.2 * falloff;
+          initData[idx] = (n2 * 0.1) * falloff;
+          initData[idx+1] = (n3 * 0.1) * falloff;
+          initData[idx+2] = dens;
+          initData[idx+3] = tmp;
         }
       }
       gl.bindTexture(gl.TEXTURE_2D, fboA.tex);
-      gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, simW, simH, gl.RGBA, gl.FLOAT, init);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, sW, sH, 0, gl.RGBA, gl.HALF_FLOAT, initData);
 
       const simLocs = {
         state: gl.getUniformLocation(simProg, "u_state"),
         res: gl.getUniformLocation(simProg, "u_res"),
         mouse: gl.getUniformLocation(simProg, "u_mouse"),
-        mouseDown: gl.getUniformLocation(simProg, "u_mouseDown"),
-        mouseSpeed: gl.getUniformLocation(simProg, "u_mouseSpeed"),
+        mousePrev: gl.getUniformLocation(simProg, "u_mousePrev"),
+        gravity: gl.getUniformLocation(simProg, "u_gravity"),
+        impulse: gl.getUniformLocation(simProg, "u_impulse"),
+        dt: gl.getUniformLocation(simProg, "u_dt"),
         time: gl.getUniformLocation(simProg, "u_time"),
       };
       const dispLocs = {
         state: gl.getUniformLocation(dispProg, "u_state"),
         res: gl.getUniformLocation(dispProg, "u_res"),
+        time: gl.getUniformLocation(dispProg, "u_time"),
         fade: gl.getUniformLocation(dispProg, "u_fade"),
       };
 
-      let mx = 0.5, my = 0.5, pmx = 0.5, pmy = 0.5, mDown = 0, mSpd = 0, t = 0;
+      let mx = 0.5, my = 0.5, pmx = 0.5, pmy = 0.5;
+      let mouseDown = false, impulseFrames = 0, mouseSpeed = 0, time = 0;
 
-      function onMM(e) { mx = e.clientX / innerWidth; my = 1 - e.clientY / innerHeight; }
-      function onMD() { mDown = 1; }
-      function onMU() { mDown = 0; }
+      function onMM(e) {
+        pmx = mx; pmy = my;
+        mx = e.clientX / innerWidth; my = 1 - e.clientY / innerHeight;
+        mouseSpeed = Math.sqrt((mx-pmx)**2 + (my-pmy)**2);
+      }
+      function onMD() { mouseDown = true; impulseFrames = 15; }
+      function onMU() { mouseDown = false; }
       addEventListener("pointermove", onMM);
       addEventListener("pointerdown", onMD);
       addEventListener("pointerup", onMU);
 
       return {
-        gl, simProg, dispProg, fboA, fboB, simW, simH, cW: cW, cH: cH,
+        gl, simProg, dispProg, fboA, fboB, sW, sH, cW, cH,
         simLocs, dispLocs, bindAttrib, vbuf,
-        mx: () => mx, my: () => my, mDown: () => mDown,
-        mSpd: () => mSpd, t: () => t,
-        step() {
-          mSpd = Math.hypot(mx - pmx, my - pmy);
-          pmx = mx; pmy = my; t += 1;
+        getGrav() { return mouseDown ? 8.0 : (0.5 + mouseSpeed * 40.0); },
+        getImp() {
+          const v = impulseFrames > 0 ? (impulseFrames / 15.0) : 0.0;
+          if (impulseFrames > 0) impulseFrames--;
+          return v;
         },
+        mx: () => mx, my: () => my, pmx: () => pmx, pmy: () => pmy,
+        time: () => time,
+        tick(dt) { time += dt; },
         destroy() {
           removeEventListener("pointermove", onMM);
           removeEventListener("pointerdown", onMD);
@@ -1682,24 +1884,18 @@ void main() { gl_Position = vec4(a_pos, 0.0, 1.0); }`;
 
     function drawCrash(dt) {
       const dur = 7.0;
-      const pr = Math.min(1, phaseT / dur);
 
-      // 0-0.3s: white flash on 2D canvas
       if (phaseT < 0.3) {
         const fi = phaseT / 0.3;
         const flashA = fi < 0.2 ? fi / 0.2 : 1 - (fi - 0.2) / 0.8;
         ctx.fillStyle = "rgba(255,240,230," + flashA + ")";
         ctx.fillRect(0, 0, W, H);
-        const shk = (1 - fi) * 20;
-        ctx.save(); ctx.translate((Math.random()-0.5)*shk, (Math.random()-0.5)*shk); ctx.restore();
         return;
       }
 
-      // init WebGL on first frame after flash
       if (!crashGL) {
         crashGL = initCrashGL();
         if (!crashGL) {
-          // fallback: skip to drift
           phase = "game"; phaseT = 0;
           P.x = 0; P.y = 0; P.vx = 0; P.vy = 0; P.tilt = 0; P.tumble = 0;
           driftZ = 0; ended = false;
@@ -1707,33 +1903,36 @@ void main() { gl_Position = vec4(a_pos, 0.0, 1.0); }`;
         }
       }
 
-      // hide the 2D canvas behind WebGL overlay
       ctx.clearRect(0, 0, W, H);
 
       const g = crashGL;
       const gl = g.gl;
-      g.step();
+      g.tick(dt);
 
-      // sim passes (10 per frame)
+      const grav = g.getGrav();
+      const imp = g.getImp();
+
+      // sim pass
       gl.useProgram(g.simProg);
+      gl.bindBuffer(gl.ARRAY_BUFFER, g.vbuf);
       g.bindAttrib(g.simProg);
-      gl.viewport(0, 0, g.simW, g.simH);
+      gl.viewport(0, 0, g.sW, g.sH);
 
-      for (let i = 0; i < 10; i++) {
-        gl.bindFramebuffer(gl.FRAMEBUFFER, g.fboB.fbo);
-        gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D, g.fboA.tex);
-        gl.uniform1i(g.simLocs.state, 0);
-        gl.uniform2f(g.simLocs.res, g.simW, g.simH);
-        gl.uniform2f(g.simLocs.mouse, g.mx(), g.my());
-        gl.uniform1f(g.simLocs.mouseDown, g.mDown());
-        gl.uniform1f(g.simLocs.mouseSpeed, g.mSpd());
-        gl.uniform1f(g.simLocs.time, g.t() + i * 0.1);
-        gl.drawArrays(gl.TRIANGLES, 0, 3);
-        const tmp = g.fboA; g.fboA = g.fboB; g.fboB = tmp;
-      }
+      gl.bindFramebuffer(gl.FRAMEBUFFER, g.fboB.fbo);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, g.fboA.tex);
+      gl.uniform1i(g.simLocs.state, 0);
+      gl.uniform2f(g.simLocs.res, g.sW, g.sH);
+      gl.uniform2f(g.simLocs.mouse, g.mx(), g.my());
+      gl.uniform2f(g.simLocs.mousePrev, g.pmx(), g.pmy());
+      gl.uniform1f(g.simLocs.gravity, grav);
+      gl.uniform1f(g.simLocs.impulse, imp);
+      gl.uniform1f(g.simLocs.dt, Math.min(dt, 0.033));
+      gl.uniform1f(g.simLocs.time, g.time());
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+      const tmp = g.fboA; g.fboA = g.fboB; g.fboB = tmp;
 
-      // display pass with fade
+      // display pass
       let fade = 1;
       if (phaseT < 0.8) fade = (phaseT - 0.3) / 0.5;
       if (phaseT > 6.0) fade = Math.max(0, 1 - (phaseT - 6.0) / 1.0);
@@ -1741,15 +1940,16 @@ void main() { gl_Position = vec4(a_pos, 0.0, 1.0); }`;
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
       gl.viewport(0, 0, g.cW, g.cH);
       gl.useProgram(g.dispProg);
+      gl.bindBuffer(gl.ARRAY_BUFFER, g.vbuf);
       g.bindAttrib(g.dispProg);
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, g.fboA.tex);
       gl.uniform1i(g.dispLocs.state, 0);
       gl.uniform2f(g.dispLocs.res, g.cW, g.cH);
+      gl.uniform1f(g.dispLocs.time, g.time());
       gl.uniform1f(g.dispLocs.fade, fade);
-      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
-      // transition to drift after 7s
       if (phaseT >= dur) {
         g.destroy(); crashGL = null;
         P.x = 0; P.y = 0; P.vx = 0; P.vy = 0; P.tilt = 0; P.tumble = 0;
