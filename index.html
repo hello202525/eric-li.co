@@ -1075,61 +1075,52 @@
     const cDust = [];
     let cFlash = 0;
 
-    // ===== GAME WORLD (3rd-person) =====
-    const WORLD_Z = 5000;
-    const HORIZON = H * 0.4;
-    const CAM_H = 50;
-    const PFOV = 220;
-    const DRAW_DIST = 1000;
+    // ===== GAME WORLD =====
+    const WORLD_Z = 4800;
+    const HORIZ = H * 0.42;
+    const CAM_H = 48;
+    const FOV = 200;
+    const DRAW_D = 900;
 
     const wRocks = [];
-    for (let i = 0; i < 140; i++) {
-      const rz = 30 + hash(i * 97) * (WORLD_Z - 600);
-      const rx = (hash(i * 53) - 0.5) * 700;
-      const rs = 2 + hash(i * 71) * 14;
-      const nv = 5 + Math.floor(hash(i * 37) * 4);
+    for (let i = 0; i < 80; i++) {
+      const rz = 60 + hash(i * 97) * (WORLD_Z - 800);
+      const rx = (hash(i * 53) - 0.5) * 600;
+      const isMesa = hash(i * 41) > 0.82;
+      const rs = isMesa ? (20 + hash(i * 71) * 30) : (3 + hash(i * 71) * 10);
+      const nv = isMesa ? (6 + Math.floor(hash(i * 37) * 3)) : (4 + Math.floor(hash(i * 37) * 3));
       const verts = [];
       for (let v = 0; v < nv; v++) {
         const a = (v / nv) * Math.PI * 2;
-        const rad = 0.55 + hash(i * 13 + v * 41) * 0.45;
-        verts.push({ dx: Math.cos(a) * rs * rad * 0.8, dy: -Math.abs(Math.sin(a)) * rs * rad });
+        const flat = isMesa ? 0.35 + hash(i * 13 + v * 41) * 0.15 : 0;
+        const rad = isMesa ? (0.7 + flat) : (0.5 + hash(i * 13 + v * 41) * 0.5);
+        const hMult = isMesa ? (1.5 + hash(v * 23 + i) * 0.8) : 1.0;
+        verts.push({ dx: Math.cos(a) * rs * rad * 0.7, dy: -Math.abs(Math.sin(a)) * rs * rad * hMult });
       }
-      wRocks.push({ x: rx, z: rz, size: rs, verts });
-    }
-
-    // terrain undulation: subtle height variation based on world z
-    function groundH(wz) {
-      return Math.sin(wz * 0.003) * 12 + Math.sin(wz * 0.0073 + 1.5) * 8 + Math.sin(wz * 0.017) * 4;
+      wRocks.push({ x: rx, z: rz, size: rs, mesa: isMesa, verts });
     }
 
     const mtnPts = [];
-    for (let i = 0; i < 100; i++) {
-      const ang = (i / 100) * Math.PI * 2;
-      const h = (12 + hash(i * 7919) * 40) * (0.5 + 0.5 * Math.sin(i * 0.5 + 2));
-      mtnPts.push({ ang, h });
+    for (let i = 0; i <= 120; i++) {
+      const t = i / 120;
+      const h = (10 + hash(i * 7919) * 30) * (0.4 + 0.6 * Math.sin(i * 0.4 + 1.7)) * (0.7 + 0.3 * Math.sin(i * 1.3));
+      mtnPts.push({ t, h });
     }
 
     const skyStars = [];
-    for (let i = 0; i < 220; i++) {
-      skyStars.push({ x: hash(i + 200) * W, y: hash(i + 400) * HORIZON * 0.9, r: 0.15 + hash(i + 600) * 0.9, tw: hash(i + 800) * Math.PI * 2 });
-    }
+    for (let i = 0; i < 200; i++) skyStars.push({ x: hash(i+200)*W, y: hash(i+400)*HORIZ*0.85, r: 0.2+hash(i+600)*0.8, tw: hash(i+800)*6.28 });
 
     const shooters = [];
-    let shootTimer = 3 + Math.random() * 5;
+    let shootTimer = 4 + Math.random() * 8;
 
-    const gameDust = [];
-    for (let i = 0; i < 60; i++) {
-      gameDust.push({
-        x: (Math.random() - 0.5) * 600,
-        z: Math.random() * DRAW_DIST,
-        y: Math.random() * 35,
-        vx: 10 + Math.random() * 25,
-        s: 0.3 + Math.random() * 1.5,
-        a: 0.03 + Math.random() * 0.07,
-      });
-    }
+    const windStreaks = [];
+    for (let i = 0; i < 35; i++) windStreaks.push({
+      x: Math.random() * W, y: HORIZ + Math.random() * (H - HORIZ),
+      len: 30 + Math.random() * 80, spd: 60 + Math.random() * 140,
+      a: 0.01 + Math.random() * 0.025,
+    });
 
-    const MON_Z = WORLD_Z - 150;
+    const MON_Z = WORLD_Z - 140;
     let monHit = false, monT = 0;
 
     const P = { x: 0, z: 0, y: 0, vy: 0, vx: 0, speed: 130, g: true, stride: 0 };
@@ -1556,209 +1547,184 @@
 
     // ======== GAME (3rd-person) ========
     function drawGame(dt) {
-      if (monHit) {
-        monT += dt;
-        if (monT > 6) { setPhase("ending"); return; }
-      }
+      if (monHit) { monT += dt; if (monT > 6.5) { setPhase("ending"); return; } }
 
       const cx = W / 2;
       const distToMon = MON_Z - P.z;
-      const approaching = distToMon < 400 && distToMon > 0;
 
       // --- physics ---
       if (!monHit) {
-        const BASE_SPD = 140, SPRINT = 230, STRAFE = 180, JUMP = -260, GRAV = 330;
+        const WALK = 130, RUN = 220, STRAFE = 160, JUMP = -240, GRAV = 310;
         const fwd = keys["ArrowUp"] || keys["KeyW"];
-        let targetSpd = fwd ? SPRINT : BASE_SPD;
-
-        // auto-decelerate approaching monolith
-        if (distToMon < 300 && distToMon > 0) {
-          const slowFactor = Math.max(0.15, distToMon / 300);
-          targetSpd *= slowFactor;
-        }
-        P.speed += (targetSpd - P.speed) * dt * 3;
-
-        if (keys["ArrowLeft"] || keys["KeyA"]) P.vx -= STRAFE * dt * 3.5;
-        if (keys["ArrowRight"] || keys["KeyD"]) P.vx += STRAFE * dt * 3.5;
-        if ((keys["Space"]) && P.g) { P.vy = JUMP; P.g = false; }
+        let target = fwd ? RUN : WALK;
+        if (distToMon < 350 && distToMon > 0) target *= Math.max(0.12, distToMon / 350);
+        P.speed += (target - P.speed) * dt * 2.8;
+        if (keys["ArrowLeft"] || keys["KeyA"]) P.vx -= STRAFE * dt * 3;
+        if (keys["ArrowRight"] || keys["KeyD"]) P.vx += STRAFE * dt * 3;
+        if (keys["Space"] && P.g) { P.vy = JUMP; P.g = false; }
         P.vy += GRAV * dt;
-        P.vx *= Math.pow(0.86, dt * 60);
+        P.vx *= Math.pow(0.85, dt * 60);
         P.z += P.speed * dt;
         P.x += P.vx * dt;
         P.y += P.vy * dt;
         if (P.y >= 0) { P.y = 0; P.vy = 0; P.g = true; } else { P.g = false; }
-        P.x = Math.max(-280, Math.min(280, P.x));
-
-        if (P.g && P.speed > 40) P.stride += dt * P.speed * 0.055;
-
-        if (P.z >= MON_Z - 25 && Math.abs(P.x) < 50) {
-          monHit = true; monT = 0;
-        }
-
-        // foot dust
-        if (P.g && P.speed > 50 && Math.random() < 0.35) {
-          footDust.push({
-            x: P.x + (Math.random() - 0.5) * 12,
-            z: P.z - 3 - Math.random() * 6,
-            y: Math.random() * 4,
-            life: 0.6 + Math.random() * 0.5,
-            s: 1.5 + Math.random() * 3,
-          });
+        P.x = Math.max(-260, Math.min(260, P.x));
+        if (P.g && P.speed > 35) P.stride += dt * P.speed * 0.05;
+        if (P.z >= MON_Z - 20 && Math.abs(P.x) < 45) { monHit = true; monT = 0; }
+        if (P.g && P.speed > 45 && Math.random() < 0.3) {
+          footDust.push({ x:P.x+(Math.random()-0.5)*10, z:P.z-4-Math.random()*5, y:Math.random()*3, life:0.5+Math.random()*0.4, s:1.2+Math.random()*2.5 });
         }
       }
 
-      // camera
-      const sprintI = Math.min(1, P.speed / 230);
-      const sway = monHit ? 0 : Math.sin(P.stride * 0.5) * 3 * sprintI;
-      const bob = monHit ? 0 : Math.abs(Math.sin(P.stride)) * 3.5 * sprintI;
-      const gndH = groundH(P.z);
-      const effHorizon = HORIZON + bob + gndH * 0.15;
-      const effCamH = CAM_H - gndH * 0.4;
+      const runI = Math.min(1, P.speed / 220);
+      const sway = monHit ? 0 : Math.sin(P.stride * 0.5) * 2 * runI;
+      const bob = monHit ? 0 : Math.abs(Math.sin(P.stride)) * 2 * runI;
+      const hLine = HORIZ + bob;
 
       function proj(wx, wy, wz) {
-        const dz = wz - P.z;
-        if (dz < 1) return null;
-        const sc = PFOV / dz;
-        return { sx: cx + (wx - P.x) * sc + sway, sy: effHorizon + (effCamH - wy) * sc + bob, sc };
+        const dz = wz - P.z; if (dz < 1) return null;
+        const sc = FOV / dz;
+        return { sx: cx + (wx - P.x) * sc + sway, sy: hLine + (CAM_H - wy) * sc + bob, sc };
       }
 
-      // --- sky ---
+      // --- SKY: rich gradient ---
       const wp = Math.min(1, P.z / WORLD_Z);
-      const skyGrad = ctx.createLinearGradient(0, 0, 0, effHorizon);
-      const ss = wp * 0.35;
-      skyGrad.addColorStop(0, "rgb(" + Math.floor(6 + ss * 14) + "," + Math.floor(4 + ss * 6) + "," + Math.floor(3 + ss * 12) + ")");
-      skyGrad.addColorStop(0.55, "rgb(" + Math.floor(16 + ss * 12) + "," + Math.floor(10 + ss * 5) + "," + Math.floor(7 + ss * 10) + ")");
-      skyGrad.addColorStop(1, "#2a1610");
-      ctx.fillStyle = skyGrad;
-      ctx.fillRect(0, 0, W, Math.ceil(effHorizon) + 1);
+      const skyG = ctx.createLinearGradient(0, 0, 0, hLine);
+      skyG.addColorStop(0, "#030206");
+      skyG.addColorStop(0.3, "#0a060c");
+      skyG.addColorStop(0.65, "#1a0e0c");
+      skyG.addColorStop(1, "#2d1610");
+      ctx.fillStyle = skyG;
+      ctx.fillRect(0, 0, W, Math.ceil(hLine) + 1);
+
+      // phobos
+      const moonX = W * 0.73, moonY = hLine * 0.22, moonR = Math.max(4, W * 0.004);
+      ctx.fillStyle = "rgba(170,165,155,0.2)";
+      ctx.beginPath(); ctx.arc(moonX, moonY, moonR, 0, 6.28); ctx.fill();
+      ctx.fillStyle = "#030206";
+      ctx.beginPath(); ctx.arc(moonX + moonR * 0.45, moonY - moonR * 0.2, moonR * 0.82, 0, 6.28); ctx.fill();
 
       // stars
       for (const s of skyStars) {
-        const tw = 0.25 + 0.75 * Math.sin(s.tw + phaseT * 0.3);
-        ctx.fillStyle = "rgba(232,230,223," + (tw * 0.35) + ")";
-        ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2); ctx.fill();
+        const tw = 0.2 + 0.8 * Math.sin(s.tw + phaseT * 0.25);
+        ctx.fillStyle = "rgba(230,228,220," + (tw * 0.3) + ")";
+        ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, 6.28); ctx.fill();
       }
 
       // shooting stars
       shootTimer -= dt;
       if (shootTimer <= 0 && !monHit) {
-        shootTimer = 5 + Math.random() * 10;
-        shooters.push({ x: Math.random()*W, y: Math.random()*HORIZON*0.4, vx: 280+Math.random()*220, vy: 35+Math.random()*30, life: 0.5+Math.random()*0.4 });
+        shootTimer = 5 + Math.random() * 12;
+        shooters.push({ x: Math.random()*W, y: Math.random()*hLine*0.4, vx: 300+Math.random()*200, vy: 30+Math.random()*25, life: 0.4+Math.random()*0.3 });
       }
       for (let i = shooters.length - 1; i >= 0; i--) {
         const s = shooters[i];
-        s.x += s.vx * dt; s.y += s.vy * dt; s.life -= dt * 1.2;
+        s.x += s.vx * dt; s.y += s.vy * dt; s.life -= dt * 1.3;
         if (s.life <= 0) { shooters.splice(i, 1); continue; }
-        ctx.strokeStyle = "rgba(232,230,223," + (s.life * 0.4) + ")";
-        ctx.lineWidth = 0.7;
-        ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(s.x - s.vx*0.04, s.y - s.vy*0.04); ctx.stroke();
+        ctx.strokeStyle = "rgba(230,228,220," + (s.life * 0.35) + ")";
+        ctx.lineWidth = 0.6;
+        ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(s.x - s.vx*0.035, s.y - s.vy*0.035); ctx.stroke();
       }
 
-      // mountains — full 360 horizon
-      ctx.fillStyle = "rgba(16,9,6,0.55)";
-      ctx.beginPath();
-      ctx.moveTo(-5, effHorizon);
-      for (const pt of mtnPts) {
-        ctx.lineTo(pt.ang / (Math.PI * 2) * W, effHorizon - pt.h);
-      }
-      ctx.lineTo(W + 5, effHorizon);
-      ctx.closePath();
-      ctx.fill();
-
-      // haze
-      const hazeG = ctx.createLinearGradient(0, effHorizon - 18, 0, effHorizon + 6);
-      hazeG.addColorStop(0, "rgba(42,22,16,0)");
-      hazeG.addColorStop(1, "rgba(42,22,16,0.3)");
-      ctx.fillStyle = hazeG;
-      ctx.fillRect(0, effHorizon - 18, W, 24);
-
-      // --- ground plane ---
-      const STRIP_Z = 16;
-      const gc1 = [105, 48, 30], gc2 = [75, 34, 22], fogC = [36, 19, 13];
-      for (let row = Math.ceil(effHorizon); row < H; ) {
-        const rel = row - effHorizon;
-        const rowH = rel < 10 ? 4 : rel < 35 ? 3 : rel < 90 ? 2 : 1;
-        if (rel < 0.5) { row += rowH; continue; }
-        const z = PFOV * effCamH / rel;
-        const wz = P.z + z;
-        const strip = Math.floor(wz / STRIP_Z);
-        const base = strip % 2 === 0 ? gc1 : gc2;
-        const fog = Math.min(0.92, z / 700);
-        const r = Math.floor(base[0] * (1 - fog) + fogC[0] * fog);
-        const g = Math.floor(base[1] * (1 - fog) + fogC[1] * fog);
-        const b = Math.floor(base[2] * (1 - fog) + fogC[2] * fog);
-        ctx.fillStyle = "rgb(" + r + "," + g + "," + b + ")";
-        ctx.fillRect(0, row, W, rowH);
-        row += rowH;
+      // mountains — full wrap, layered
+      for (let layer = 0; layer < 2; layer++) {
+        const mAlpha = layer === 0 ? 0.25 : 0.5;
+        const mScale = layer === 0 ? 1.3 : 1.0;
+        const mOff = layer === 0 ? 8 : 0;
+        ctx.fillStyle = "rgba(14,8,6," + mAlpha + ")";
+        ctx.beginPath();
+        ctx.moveTo(-5, hLine + mOff);
+        for (const pt of mtnPts) ctx.lineTo(pt.t * W, hLine - pt.h * mScale + mOff);
+        ctx.lineTo(W + 5, hLine + mOff);
+        ctx.closePath(); ctx.fill();
       }
 
-      // ground convergence lines
-      ctx.strokeStyle = "rgba(120,60,35,0.1)";
-      ctx.lineWidth = 0.6;
-      for (let i = -14; i <= 14; i++) {
-        const wx = i * 28;
-        const nearSc = PFOV / 4;
-        const sx = cx + (wx - P.x) * nearSc + sway;
-        ctx.beginPath(); ctx.moveTo(cx + sway, effHorizon); ctx.lineTo(sx, H); ctx.stroke();
+      // atmospheric haze band
+      const hzG = ctx.createLinearGradient(0, hLine - 25, 0, hLine + 10);
+      hzG.addColorStop(0, "rgba(45,22,16,0)");
+      hzG.addColorStop(0.7, "rgba(45,22,16,0.25)");
+      hzG.addColorStop(1, "rgba(45,22,16,0.15)");
+      ctx.fillStyle = hzG;
+      ctx.fillRect(0, hLine - 25, W, 35);
+
+      // --- GROUND: smooth gradient, no scanlines ---
+      const gG = ctx.createLinearGradient(0, hLine, 0, H);
+      gG.addColorStop(0, "#2d1610");
+      gG.addColorStop(0.06, "#4a251a");
+      gG.addColorStop(0.2, "#6a3424");
+      gG.addColorStop(0.5, "#85422e");
+      gG.addColorStop(1, "#95503a");
+      ctx.fillStyle = gG;
+      ctx.fillRect(0, hLine, W, H - hLine);
+
+      // scrolling ground cracks (perspective-correct thin horizontal lines)
+      for (let i = 0; i < 35; i++) {
+        const wz = ((P.z * 0.7 + i * 28 + hash(i * 137) * 20) % 800) + 2;
+        const screenRel = FOV * CAM_H / wz;
+        const sy = hLine + screenRel;
+        if (sy <= hLine || sy >= H) continue;
+        const fog = Math.min(1, wz / 500);
+        ctx.globalAlpha = 0.045 * (1 - fog);
+        ctx.strokeStyle = "#1a0e08";
+        ctx.lineWidth = 0.4 + (1 - fog) * 0.6;
+        ctx.beginPath(); ctx.moveTo(0, sy); ctx.lineTo(W, sy); ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+
+      // subtle perspective lines
+      ctx.globalAlpha = 0.025;
+      ctx.strokeStyle = "#1a0e08";
+      ctx.lineWidth = 0.4;
+      for (let i = -7; i <= 7; i++) {
+        const sx = cx + (i * 35 - P.x) * (FOV / 3.5) + sway;
+        ctx.beginPath(); ctx.moveTo(cx + sway, hLine); ctx.lineTo(sx, H); ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+
+      // wind streaks across surface
+      for (const w of windStreaks) {
+        w.x += w.spd * dt;
+        if (w.x > W + w.len) { w.x = -w.len; w.y = hLine + 15 + Math.random() * (H - hLine - 30); }
+        ctx.strokeStyle = "rgba(160,100,70," + w.a + ")";
+        ctx.lineWidth = 0.4;
+        ctx.beginPath(); ctx.moveTo(w.x, w.y); ctx.lineTo(w.x + w.len, w.y - 0.5); ctx.stroke();
       }
 
-      // sprint speed lines
-      if (sprintI > 0.5 && !monHit) {
-        const si = (sprintI - 0.5) * 2;
-        ctx.globalAlpha = si * 0.07;
-        ctx.strokeStyle = "#aa7050";
-        ctx.lineWidth = 0.8;
-        for (let i = 0; i < 12; i++) {
-          const ly = effHorizon + 30 + hash(i * 137 + Math.floor(phaseT * 3)) * (H - effHorizon - 60);
-          const lx1 = hash(i * 53 + Math.floor(phaseT * 4)) * W * 0.3;
-          ctx.beginPath(); ctx.moveTo(lx1, ly); ctx.lineTo(lx1 + 60 + si * 80, ly); ctx.stroke();
-          const rx1 = W - hash(i * 71 + Math.floor(phaseT * 4)) * W * 0.3;
-          ctx.beginPath(); ctx.moveTo(rx1, ly); ctx.lineTo(rx1 - 60 - si * 80, ly); ctx.stroke();
-        }
-        ctx.globalAlpha = 1;
-      }
-
-      // horizon glow
-      if (wp > 0.15) {
-        const gi = Math.min(0.12, (wp - 0.15) * 0.16);
-        const gx = cx + (0 - P.x) * (PFOV / 700) + sway;
-        const hGlow = ctx.createRadialGradient(gx, effHorizon, 0, gx, effHorizon, H * 0.45);
-        hGlow.addColorStop(0, "rgba(232,230,223," + gi + ")");
-        hGlow.addColorStop(1, "rgba(232,230,223,0)");
-        ctx.fillStyle = hGlow;
+      // horizon glow toward monolith
+      if (wp > 0.1) {
+        const gi = Math.min(0.1, (wp - 0.1) * 0.14);
+        const gx = cx + (0 - P.x) * (FOV / 800) + sway;
+        const hG = ctx.createRadialGradient(gx, hLine, 0, gx, hLine, H * 0.5);
+        hG.addColorStop(0, "rgba(230,225,215," + gi + ")");
+        hG.addColorStop(1, "rgba(230,225,215,0)");
+        ctx.fillStyle = hG;
         ctx.fillRect(0, 0, W, H);
       }
 
-      // --- z-sorted objects ---
+      // --- Z-SORTED WORLD ---
       const drawList = [];
       for (const rock of wRocks) {
         const dz = rock.z - P.z;
-        if (dz > 1 && dz < DRAW_DIST) drawList.push({ t: "r", dz, o: rock });
+        if (dz > 1 && dz < DRAW_D) drawList.push({ t: "r", dz, o: rock });
       }
       { const dz = MON_Z - P.z; if (dz > 0) drawList.push({ t: "m", dz }); }
       for (const d of footDust) {
         const dz = d.z - P.z;
-        if (dz > 0.2 && dz < 250) drawList.push({ t: "d", dz, o: d });
-      }
-      for (const d of gameDust) {
-        d.x += d.vx * dt;
-        d.z -= P.speed * dt * 0.18;
-        if (d.z < -15) { d.z = DRAW_DIST * 0.7 + Math.random() * DRAW_DIST * 0.3; d.x = (Math.random() - 0.5) * 600; }
-        if (d.z > 1 && d.z < DRAW_DIST) drawList.push({ t: "a", dz: d.z, o: d });
+        if (dz > 0.2 && dz < 200) drawList.push({ t: "d", dz, o: d });
       }
       drawList.sort((a, b) => b.dz - a.dz);
 
       for (const item of drawList) {
         const dz = item.dz;
-        const fog = Math.min(0.88, dz / 700);
+        const fog = Math.min(0.9, dz / 650);
 
         if (item.t === "r") {
           const rock = item.o;
-          const rgh = groundH(rock.z);
-          const p = proj(rock.x, rgh * 0.3, rock.z);
-          if (!p || p.sy < effHorizon - 8) continue;
-          const alpha = (1 - fog) * 0.85;
-          ctx.fillStyle = "rgba(32,16,10," + alpha + ")";
+          const p = proj(rock.x, 0, rock.z);
+          if (!p || p.sy < hLine - 10) continue;
+          const a = (1 - fog) * 0.8;
+          const shade = rock.mesa ? "rgba(22,12,8," + a + ")" : "rgba(35,18,12," + a + ")";
+          ctx.fillStyle = shade;
           ctx.beginPath();
           for (let v = 0; v < rock.verts.length; v++) {
             const vx = p.sx + rock.verts[v].dx * p.sc;
@@ -1766,11 +1732,10 @@
             v === 0 ? ctx.moveTo(vx, vy) : ctx.lineTo(vx, vy);
           }
           ctx.closePath(); ctx.fill();
-          // shadow
-          if (rock.size > 5 && fog < 0.6) {
-            ctx.fillStyle = "rgba(0,0,0," + ((1 - fog) * 0.08) + ")";
+          if (rock.size > 6 && fog < 0.65) {
+            ctx.fillStyle = "rgba(0,0,0," + ((1-fog) * 0.07) + ")";
             ctx.beginPath();
-            ctx.ellipse(p.sx + rock.size * p.sc * 0.3, p.sy + 1, rock.size * p.sc * 0.6, rock.size * p.sc * 0.15, 0, 0, Math.PI * 2);
+            ctx.ellipse(p.sx + rock.size*p.sc*0.25, p.sy + 1, rock.size*p.sc*0.5, rock.size*p.sc*0.12, 0, 0, 6.28);
             ctx.fill();
           }
         }
@@ -1778,43 +1743,40 @@
         if (item.t === "m") {
           const p = proj(0, 0, MON_Z);
           if (!p) continue;
-          const mw = 20 * p.sc, mh = 70 * p.sc;
-          if (mh < 0.8) {
-            const flicker = 0.04 + Math.sin(phaseT * 0.8) * 0.02;
-            ctx.fillStyle = "rgba(232,230,223," + flicker + ")";
-            ctx.fillRect(p.sx - 0.5, p.sy - 1.5, 1, 3);
+          const mw = 18 * p.sc, mh = 65 * p.sc;
+          if (mh < 1) {
+            ctx.fillStyle = "rgba(230,225,215," + (0.04 + Math.sin(phaseT*0.7)*0.02) + ")";
+            ctx.fillRect(p.sx - 0.5, p.sy - 2, 1, 4);
           } else {
-            ctx.fillStyle = "rgba(4,4,4," + (1 - fog * 0.5) + ")";
+            ctx.fillStyle = "rgba(2,2,2," + (1 - fog*0.4) + ")";
             ctx.fillRect(p.sx - mw/2, p.sy - mh, mw, mh);
-            const pulse = Math.sin(phaseT * 0.7) * 0.025 + 0.035;
-            ctx.strokeStyle = "rgba(232,230,223," + (pulse * (1 - fog)) + ")";
-            ctx.lineWidth = Math.max(0.5, p.sc * 0.5);
+            const pulse = 0.03 + Math.sin(phaseT*0.6) * 0.02;
+            ctx.strokeStyle = "rgba(230,225,215," + (pulse * (1-fog)) + ")";
+            ctx.lineWidth = Math.max(0.4, p.sc * 0.4);
             ctx.strokeRect(p.sx - mw/2, p.sy - mh, mw, mh);
-
-            // glow around monolith when close
-            if (dz < 250) {
-              const gI = (250 - dz) / 250 * 0.06;
-              const mg = ctx.createRadialGradient(p.sx, p.sy - mh * 0.5, mw, p.sx, p.sy - mh * 0.5, mw * 4);
-              mg.addColorStop(0, "rgba(232,230,223," + gI + ")");
-              mg.addColorStop(1, "rgba(232,230,223,0)");
+            if (dz < 300) {
+              const gI = (300 - dz) / 300 * 0.07;
+              const mg = ctx.createRadialGradient(p.sx, p.sy - mh*0.5, mw, p.sx, p.sy - mh*0.5, mw * 5);
+              mg.addColorStop(0, "rgba(230,225,215," + gI + ")");
+              mg.addColorStop(1, "rgba(230,225,215,0)");
               ctx.fillStyle = mg;
-              ctx.fillRect(p.sx - mw * 4, p.sy - mh - mw * 4, mw * 8, mh + mw * 8);
+              ctx.fillRect(p.sx - mw*5, p.sy - mh - mw*5, mw*10, mh + mw*10);
             }
           }
 
           if (monHit) {
-            const ga = Math.min(1, monT * 0.3);
+            const ga = Math.min(1, monT * 0.25);
             for (let g = 5; g > 0; g--) {
-              ctx.strokeStyle = "rgba(232,230,223," + (ga * 0.08 / g) + ")";
-              ctx.lineWidth = g * 5 * Math.max(0.5, p.sc);
+              ctx.strokeStyle = "rgba(230,225,215," + (ga * 0.07 / g) + ")";
+              ctx.lineWidth = g * 5 * Math.max(0.4, p.sc);
               ctx.strokeRect(p.sx - mw/2, p.sy - mh, mw, mh);
             }
-            const beamA = Math.min(0.35, monT * 0.06);
+            const beamA = Math.min(0.3, monT * 0.05);
             const bw = mw * (1 + monT * 0.5);
-            const bh = Math.min(effHorizon - (p.sy - mh), mh * 3 + monT * 50 * p.sc);
+            const bh = Math.min(hLine, mh * 3 + monT * 45 * p.sc);
             const beam = ctx.createLinearGradient(p.sx, p.sy - mh - bh, p.sx, p.sy - mh);
-            beam.addColorStop(0, "rgba(232,230,223,0)");
-            beam.addColorStop(1, "rgba(232,230,223," + beamA + ")");
+            beam.addColorStop(0, "rgba(230,225,215,0)");
+            beam.addColorStop(1, "rgba(230,225,215," + beamA + ")");
             ctx.fillStyle = beam;
             ctx.beginPath();
             ctx.moveTo(p.sx - bw, p.sy - mh - bh);
@@ -1822,193 +1784,143 @@
             ctx.lineTo(p.sx + mw/2, p.sy - mh);
             ctx.lineTo(p.sx - mw/2, p.sy - mh);
             ctx.closePath(); ctx.fill();
-
-            // rising light particles from monolith
-            if (monT > 0.5 && Math.random() < 0.4) {
-              riseParts.push({
-                x: p.sx + (Math.random()-0.5) * mw * 1.5,
-                y: p.sy - mh,
-                vy: -20 - Math.random() * 40,
-                life: 1, r: 0.5 + Math.random() * 1.5,
-              });
+            if (monT > 0.5 && Math.random() < 0.35) {
+              riseParts.push({ x: p.sx + (Math.random()-0.5)*mw*2, y: p.sy - mh, vy: -18-Math.random()*35, life: 1, r: 0.4+Math.random()*1.2 });
             }
           }
         }
 
         if (item.t === "d") {
           const d = item.o;
-          d.life -= dt * 1.5;
-          d.y += 4 * dt;
+          d.life -= dt * 1.6; d.y += 3 * dt;
           const p = proj(d.x, d.y, d.z);
           if (!p || d.life <= 0) continue;
-          ctx.fillStyle = "rgba(130,75,50," + (d.life * 0.3 * (1-fog)) + ")";
+          ctx.fillStyle = "rgba(120,70,48," + (d.life * 0.25 * (1-fog)) + ")";
           const sz = Math.max(0.5, d.s * p.sc);
           ctx.fillRect(p.sx-sz/2, p.sy-sz/2, sz, sz);
         }
-
-        if (item.t === "a") {
-          const d = item.o;
-          const p = proj(d.x, d.y, P.z + d.z);
-          if (!p) continue;
-          ctx.fillStyle = "rgba(140,88,60," + (d.a * (1-fog)) + ")";
-          const sz = Math.max(0.3, d.s * p.sc);
-          ctx.fillRect(p.sx, p.sy, sz, sz);
-        }
       }
 
-      // rising particles update
+      // rising particles
       for (let i = riseParts.length - 1; i >= 0; i--) {
         const p = riseParts[i];
-        p.y += p.vy * dt; p.life -= dt * 0.6;
+        p.y += p.vy * dt; p.life -= dt * 0.5;
         if (p.life <= 0) { riseParts.splice(i, 1); continue; }
-        ctx.fillStyle = "rgba(232,230,223," + (p.life * 0.4) + ")";
-        ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = "rgba(230,225,215," + (p.life * 0.35) + ")";
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 6.28); ctx.fill();
       }
 
-      // clean up foot dust
       for (let i = footDust.length - 1; i >= 0; i--) {
-        if (footDust[i].life <= 0 || footDust[i].z < P.z - 30) footDust.splice(i, 1);
+        if (footDust[i].life <= 0 || footDust[i].z < P.z - 25) footDust.splice(i, 1);
       }
 
-      // --- player (from behind, ~2.5x bigger) ---
+      // --- PLAYER: clean silhouette with bright helmet ---
       if (!monHit || monT < 4) {
         const pa = monHit ? Math.max(0, 1 - (monT - 2.5) / 1.5) : 1;
         ctx.globalAlpha = pa;
 
-        const S = 2.4;
+        const S = 1.4;
+        const groundY = H * 0.74;
         const pcx = cx + sway;
-        const groundY = H * 0.78;
-        const pcy = groundY - 42 * S - P.y * 3 + bob;
+        const pcy = groundY - 38 * S - P.y * 2.5 + bob;
         const st = P.stride;
-        const runI = Math.min(1, P.speed / 180);
 
         // shadow
-        ctx.fillStyle = "rgba(0,0,0,0.15)";
-        ctx.beginPath();
-        ctx.ellipse(pcx, groundY + bob, 18 * S, 5 * S, 0, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.fillStyle = "rgba(0,0,0,0.18)";
+        ctx.beginPath(); ctx.ellipse(pcx, groundY + 2 + bob, 14*S, 4*S, 0, 0, 6.28); ctx.fill();
 
-        // legs with knees
-        const legAmp = P.g ? runI * 10 * S : 4 * S;
-        const Lhip = { x: pcx - 4 * S, y: pcy + 20 * S };
-        const Rhip = { x: pcx + 4 * S, y: pcy + 20 * S };
-        const Lknee = { x: Lhip.x - 1*S + Math.sin(st) * legAmp * 0.3, y: Lhip.y + 10*S + Math.abs(Math.sin(st)) * 2*S };
-        const Rknee = { x: Rhip.x + 1*S - Math.sin(st) * legAmp * 0.3, y: Rhip.y + 10*S + Math.abs(Math.cos(st)) * 2*S };
-        const Lfoot = { x: Lknee.x + Math.sin(st) * legAmp * 0.7, y: groundY + bob };
-        const Rfoot = { x: Rknee.x - Math.sin(st) * legAmp * 0.7, y: groundY + bob };
+        // the suit is a dark silhouette — near black
+        const suit = "#1c1a18";
 
-        ctx.strokeStyle = "#c0bab0";
-        ctx.lineWidth = 3.5 * S;
-        ctx.lineCap = "round";
-        ctx.lineJoin = "round";
-        ctx.beginPath(); ctx.moveTo(Lhip.x, Lhip.y); ctx.lineTo(Lknee.x, Lknee.y); ctx.lineTo(Lfoot.x, Lfoot.y); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(Rhip.x, Rhip.y); ctx.lineTo(Rknee.x, Rknee.y); ctx.lineTo(Rfoot.x, Rfoot.y); ctx.stroke();
+        // legs: 2-segment with knees
+        const legA = P.g ? Math.sin(st) * 0.55 * runI : -0.15;
+        ctx.strokeStyle = suit; ctx.lineWidth = 3.2 * S; ctx.lineCap = "round"; ctx.lineJoin = "round";
+
+        const lhx = pcx - 3.5*S, rhx = pcx + 3.5*S, hipY = pcy + 17*S;
+        const lkx = lhx - 1*S + legA * 10*S, lky = hipY + 10*S + Math.abs(Math.sin(st)) * 2*S;
+        const lfx = lkx + legA * 14*S, lfy = groundY + bob;
+        const rkx = rhx + 1*S - legA * 10*S, rky = hipY + 10*S + Math.abs(Math.cos(st)) * 2*S;
+        const rfx = rkx - legA * 14*S, rfy = groundY + bob;
+
+        ctx.beginPath(); ctx.moveTo(lhx, hipY); ctx.lineTo(lkx, lky); ctx.lineTo(lfx, lfy); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(rhx, hipY); ctx.lineTo(rkx, rky); ctx.lineTo(rfx, rfy); ctx.stroke();
 
         // boots
-        ctx.fillStyle = "#8a857c";
-        ctx.fillRect(Lfoot.x - 3*S, Lfoot.y - 2*S, 6*S, 3.5*S);
-        ctx.fillRect(Rfoot.x - 3*S, Rfoot.y - 2*S, 6*S, 3.5*S);
+        ctx.fillStyle = "#0e0d0c";
+        ctx.fillRect(lfx - 2.5*S, lfy - 1.5*S, 5*S, 2.5*S);
+        ctx.fillRect(rfx - 2.5*S, rfy - 1.5*S, 5*S, 2.5*S);
 
-        // torso
-        const torW = 18 * S, torH = 20 * S;
-        ctx.fillStyle = "#d5cfc5";
+        // torso: simple filled shape
+        ctx.fillStyle = suit;
         ctx.beginPath();
-        ctx.moveTo(pcx - torW/2, pcy + torH);
-        ctx.lineTo(pcx - torW/2 - 2*S, pcy + 2*S);
-        ctx.quadraticCurveTo(pcx, pcy - 2*S, pcx + torW/2 + 2*S, pcy + 2*S);
-        ctx.lineTo(pcx + torW/2, pcy + torH);
-        ctx.closePath();
-        ctx.fill();
+        ctx.moveTo(pcx - 8*S, hipY);
+        ctx.lineTo(pcx - 9*S, pcy + 2*S);
+        ctx.quadraticCurveTo(pcx, pcy - 1*S, pcx + 9*S, pcy + 2*S);
+        ctx.lineTo(pcx + 8*S, hipY);
+        ctx.closePath(); ctx.fill();
 
-        // backpack
-        ctx.fillStyle = "#aaa599";
-        const bpW = 14*S, bpH = 16*S;
-        ctx.fillRect(pcx - bpW/2, pcy + 1*S, bpW, bpH);
-        ctx.strokeStyle = "rgba(0,0,0,0.12)";
-        ctx.lineWidth = 0.8;
-        ctx.strokeRect(pcx - bpW/2, pcy + 1*S, bpW, bpH);
-        // backpack straps
-        ctx.strokeStyle = "#9a958a";
-        ctx.lineWidth = 1.5 * S;
-        ctx.beginPath(); ctx.moveTo(pcx - bpW/2 + 2*S, pcy + 1*S); ctx.lineTo(pcx - torW/2 + 1*S, pcy - 3*S); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(pcx + bpW/2 - 2*S, pcy + 1*S); ctx.lineTo(pcx + torW/2 - 1*S, pcy - 3*S); ctx.stroke();
+        // backpack bump
+        ctx.fillStyle = "#151412";
+        ctx.fillRect(pcx - 6*S, pcy + 2*S, 12*S, 11*S);
 
-        // arms with elbows
-        const armAmp = P.g ? runI * 7 * S : 2 * S;
-        const Lshldr = { x: pcx - torW/2 - 1*S, y: pcy + 3*S };
-        const Rshldr = { x: pcx + torW/2 + 1*S, y: pcy + 3*S };
-        const Lelbow = { x: Lshldr.x - 3*S, y: Lshldr.y + 8*S + Math.sin(st + 1.5) * armAmp * 0.4 };
-        const Relbow = { x: Rshldr.x + 3*S, y: Rshldr.y + 8*S - Math.sin(st + 1.5) * armAmp * 0.4 };
-        const Lhand = { x: Lelbow.x - 1*S + Math.sin(st + 1.5) * armAmp, y: Lelbow.y + 7*S };
-        const Rhand = { x: Relbow.x + 1*S - Math.sin(st + 1.5) * armAmp, y: Relbow.y + 7*S };
-
-        ctx.strokeStyle = "#ccc6bc";
-        ctx.lineWidth = 2.8 * S;
-        ctx.beginPath(); ctx.moveTo(Lshldr.x, Lshldr.y); ctx.lineTo(Lelbow.x, Lelbow.y); ctx.lineTo(Lhand.x, Lhand.y); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(Rshldr.x, Rshldr.y); ctx.lineTo(Relbow.x, Relbow.y); ctx.lineTo(Rhand.x, Rhand.y); ctx.stroke();
-
-        // gloves
-        ctx.fillStyle = "#9a958a";
-        ctx.beginPath(); ctx.arc(Lhand.x, Lhand.y, 2*S, 0, Math.PI*2); ctx.fill();
-        ctx.beginPath(); ctx.arc(Rhand.x, Rhand.y, 2*S, 0, Math.PI*2); ctx.fill();
+        // arms: 2-segment
+        const armA = P.g ? Math.sin(st + 1.57) * 0.4 * runI : 0;
+        ctx.strokeStyle = suit; ctx.lineWidth = 2.5 * S;
+        const lsx = pcx - 9*S, rsx = pcx + 9*S, shY = pcy + 3*S;
+        ctx.beginPath(); ctx.moveTo(lsx, shY); ctx.lineTo(lsx - 2*S, shY + 8*S + armA*8*S); ctx.lineTo(lsx - 1*S + armA*7*S, shY + 15*S); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(rsx, shY); ctx.lineTo(rsx + 2*S, shY + 8*S - armA*8*S); ctx.lineTo(rsx + 1*S - armA*7*S, shY + 15*S); ctx.stroke();
 
         // neck
-        ctx.fillStyle = "#d5cfc5";
-        ctx.fillRect(pcx - 3.5*S, pcy - 5*S, 7*S, 7*S);
+        ctx.fillStyle = suit;
+        ctx.fillRect(pcx - 3*S, pcy - 4*S, 6*S, 6*S);
 
-        // helmet
-        const helmR = 11 * S;
-        ctx.fillStyle = "#e8e6df";
-        ctx.beginPath(); ctx.arc(pcx, pcy - 10*S, helmR, 0, Math.PI * 2); ctx.fill();
-
-        // helmet detail: ridge line
-        ctx.strokeStyle = "rgba(0,0,0,0.08)";
-        ctx.lineWidth = 1.2;
-        ctx.beginPath(); ctx.arc(pcx, pcy - 10*S, helmR, -0.3, Math.PI + 0.3); ctx.stroke();
-
-        // helmet reflection
-        ctx.fillStyle = "rgba(180,210,235,0.1)";
-        ctx.beginPath(); ctx.arc(pcx + 3*S, pcy - 14*S, 4*S, 0, Math.PI * 2); ctx.fill();
-
-        // subtle visor edge (back-of-head view, just a hint of the glass rim)
-        ctx.strokeStyle = "rgba(100,170,210,0.12)";
-        ctx.lineWidth = 1.5;
-        ctx.beginPath(); ctx.arc(pcx, pcy - 10*S, helmR - 1, -0.8, 0.8); ctx.stroke();
-
-        // head tilt toward strafe direction
-        if (Math.abs(P.vx) > 15) {
-          const tiltDir = P.vx > 0 ? 1 : -1;
-          const tiltAmt = Math.min(1, Math.abs(P.vx) / 100);
-          ctx.fillStyle = "rgba(232,230,223,0.04)";
-          ctx.beginPath(); ctx.arc(pcx + tiltDir * 3 * S * tiltAmt, pcy - 10*S, helmR * 0.3, 0, Math.PI*2); ctx.fill();
-        }
+        // helmet — the bright element against the dark suit
+        const hr = 9 * S;
+        ctx.fillStyle = "#eae8e2";
+        ctx.beginPath(); ctx.arc(pcx, pcy - 8*S, hr, 0, 6.28); ctx.fill();
+        // subtle shadow on helmet right side
+        ctx.fillStyle = "rgba(0,0,0,0.06)";
+        ctx.beginPath(); ctx.arc(pcx + hr*0.3, pcy - 8*S, hr * 0.85, -0.5, 1.5); ctx.fill();
+        // helmet rim
+        ctx.strokeStyle = "rgba(0,0,0,0.1)";
+        ctx.lineWidth = 0.8;
+        ctx.beginPath(); ctx.arc(pcx, pcy - 8*S, hr, 0, 6.28); ctx.stroke();
 
         ctx.globalAlpha = 1;
       }
 
-      // --- overlays ---
-      const vig = ctx.createRadialGradient(cx, H * 0.5, W * 0.22, cx, H * 0.5, W * 0.72);
+      // --- POST: vignette, atmosphere, grain ---
+      const vig = ctx.createRadialGradient(cx, H*0.48, W*0.2, cx, H*0.48, W*0.78);
       vig.addColorStop(0, "rgba(0,0,0,0)");
-      vig.addColorStop(1, "rgba(0,0,0,0.28)");
+      vig.addColorStop(1, "rgba(0,0,0,0.3)");
       ctx.fillStyle = vig;
       ctx.fillRect(0, 0, W, H);
 
-      // approaching monolith — darken edges, quiet the world
-      if (approaching && !monHit) {
+      // approaching monolith: world quiets
+      if (distToMon < 400 && distToMon > 0 && !monHit) {
         const ai = 1 - distToMon / 400;
-        ctx.fillStyle = "rgba(0,0,0," + (ai * 0.15) + ")";
+        ctx.fillStyle = "rgba(0,0,0," + (ai * 0.18) + ")";
         ctx.fillRect(0, 0, W, H);
       }
 
+      // film grain
+      ctx.globalAlpha = 0.015;
+      for (let i = 0; i < 60; i++) {
+        const gx = Math.random() * W, gy = Math.random() * H;
+        ctx.fillStyle = Math.random() > 0.5 ? "#fff" : "#000";
+        ctx.fillRect(gx, gy, 1, 1);
+      }
+      ctx.globalAlpha = 1;
+
       // fade-in
-      if (phaseT < 1.8 && !monHit) {
-        ctx.fillStyle = "rgba(0,0,0," + (1 - phaseT / 1.8) + ")";
+      if (phaseT < 2 && !monHit) {
+        ctx.fillStyle = "rgba(0,0,0," + (1 - phaseT / 2) + ")";
         ctx.fillRect(0, 0, W, H);
       }
 
       // monolith ending
-      if (monHit && monT > 2.5) {
-        const fa = Math.min(1, (monT - 2.5) / 3);
+      if (monHit && monT > 3) {
+        const fa = Math.min(1, (monT - 3) / 3);
         ctx.fillStyle = "rgba(255,255,255," + fa + ")";
         ctx.fillRect(0, 0, W, H);
       }
@@ -2019,16 +1931,15 @@
       ctx.fillStyle = "#fff";
       ctx.fillRect(0, 0, W, H);
 
-      // rising light particles linger
       for (let i = riseParts.length - 1; i >= 0; i--) {
         const p = riseParts[i];
-        p.y += p.vy * dt * 0.3; p.life -= dt * 0.3;
+        p.y += p.vy * dt * 0.2; p.life -= dt * 0.25;
         if (p.life <= 0) { riseParts.splice(i, 1); continue; }
-        ctx.fillStyle = "rgba(200,195,185," + (p.life * 0.25) + ")";
-        ctx.beginPath(); ctx.arc(p.x, p.y, p.r * 1.5, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = "rgba(190,185,175," + (p.life * 0.2) + ")";
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r * 2, 0, 6.28); ctx.fill();
       }
 
-      if (phaseT > 3.5) clearWidget();
+      if (phaseT > 4) clearWidget();
     }
 
     function frame(now) {
