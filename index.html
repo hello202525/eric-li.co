@@ -658,14 +658,16 @@
     function killBirds() {
       birdsDying = true;
       for (const b of birds) {
-        for (let i = 0; i < 20; i++) {
+        for (let i = 0; i < 30; i++) {
+          const ang = Math.random() * 6.28;
+          const spd = 0.3 + Math.random() * 1.2;
           b.dust.push({
-            x: b.x + (Math.random() - 0.5) * b.size * 1.5,
-            y: b.y + (Math.random() - 0.5) * b.size * 0.4,
-            vx: (Math.random() - 0.5) * 0.8,
-            vy: 0.3 + Math.random() * 0.8,
-            r: 0.4 + Math.random() * 0.8,
-            alpha: 0.4 + Math.random() * 0.3,
+            x: b.x + (Math.random() - 0.5) * b.size * 0.8,
+            y: b.y + (Math.random() - 0.5) * b.size * 0.3,
+            vx: Math.cos(ang) * spd,
+            vy: Math.sin(ang) * spd,
+            r: 0.2 + Math.random() * 0.3,
+            alpha: 0.25 + Math.random() * 0.2,
           });
         }
       }
@@ -705,19 +707,17 @@
         }
 
         if (birdsDying) {
-          // dust particles
+          // disintegration particles — scatter outward, no gravity
           for (const d of b.dust) {
             if (d.alpha <= 0) continue;
             d.x += d.vx;
             d.y += d.vy;
-            d.vy += 0.04;
-            d.vx *= 0.98;
-            d.alpha -= 0.015;
+            d.vx *= 0.96;
+            d.vy *= 0.96;
+            d.alpha -= 0.025;
             if (d.alpha > 0) {
-              birdCtx.fillStyle = "rgba(120,115,110," + (d.alpha * 0.6) + ")";
-              birdCtx.beginPath();
-              birdCtx.arc(d.x, d.y, d.r, 0, 6.28);
-              birdCtx.fill();
+              birdCtx.fillStyle = "rgba(25,25,30," + d.alpha + ")";
+              birdCtx.fillRect(d.x, d.y, d.r, d.r);
               anyAlive = true;
             }
           }
