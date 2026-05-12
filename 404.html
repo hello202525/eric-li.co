@@ -1095,13 +1095,17 @@
       });
   }
 
-  // === Time: dark monolith with light bleeding through ===
+  // === Time: breathing field of light ===
   function runTime() {
     const ctx = sizeWidgetCanvas();
     const W = innerWidth, H = innerHeight;
     document.body.classList.add("time-mode");
     $widgetCanvas.classList.add("show");
     let startT = performance.now();
+    // persistent trail buffer for motion blur
+    const trailCanvas = document.createElement("canvas");
+    trailCanvas.width = W; trailCanvas.height = H;
+    const tCtx = trailCanvas.getContext("2d");
 
     function step(now) {
       if (activeWidget !== "time") return;
@@ -1110,119 +1114,109 @@
       const hours = d.getHours() % 12 + d.getMinutes() / 60;
       const minutes = d.getMinutes() + d.getSeconds() / 60;
       const seconds = d.getSeconds() + d.getMilliseconds() / 1000;
+      const cx = W / 2, cy = H / 2;
+      const R = Math.min(W, H) * 0.32;
 
-      ctx.clearRect(0, 0, W, H);
+      // fade trail buffer
+      tCtx.fillStyle = "rgba(3,3,5,0.06)";
+      tCtx.fillRect(0, 0, W, H);
 
-      // void background
-      ctx.fillStyle = "#050506";
+      // draw current second as bright point on trail canvas
+      const sAng = (seconds / 60) * Math.PI * 2 - Math.PI / 2;
+      const sR = R * 0.85;
+      const sx = cx + Math.cos(sAng) * sR;
+      const sy = cy + Math.sin(sAng) * sR;
+      tCtx.fillStyle = "rgba(255,255,255,0.8)";
+      tCtx.beginPath(); tCtx.arc(sx, sy, 1.5, 0, 6.28); tCtx.fill();
+
+      // main canvas
+      ctx.fillStyle = "#030305";
       ctx.fillRect(0, 0, W, H);
 
-      const cx = W / 2, cy = H / 2;
-      // monolith dimensions — tall narrow slab
-      const slabW = Math.min(W * 0.12, 120);
-      const slabH = Math.min(H * 0.7, 500);
-      const slabX = cx - slabW / 2;
-      const slabY = cy - slabH / 2;
+      // draw trail (creates the persistence/blur)
+      ctx.drawImage(trailCanvas, 0, 0);
 
-      // ambient glow behind monolith — shifts color slowly
-      const hue = 200 + Math.sin(t * 0.05) * 30;
-      const ambR = slabH * 0.7;
-      const amb = ctx.createRadialGradient(cx, cy, slabW, cx, cy, ambR);
-      amb.addColorStop(0, "hsla(" + hue + ",40%,20%,0.12)");
-      amb.addColorStop(0.5, "hsla(" + hue + ",30%,12%,0.05)");
-      amb.addColorStop(1, "hsla(" + hue + ",20%,5%,0)");
-      ctx.fillStyle = amb;
-      ctx.fillRect(cx - ambR, cy - ambR, ambR * 2, ambR * 2);
+      // 60 minute marks — only the current minute glows bright
+      const currentMin = Math.floor(minutes);
+      for (let i = 0; i < 60; i++) {
+        const ang = (i / 60) * Math.PI * 2 - Math.PI / 2;
+        const mr = R * 0.92;
+        const mx = cx + Math.cos(ang) * mr;
+        const my = cy + Math.sin(ang) * mr;
+        const isCurrent = i === currentMin;
+        const dist = Math.abs(i - currentMin);
+        const near = dist < 3 || dist > 57 ? (1 - Math.min(dist, 60 - dist) / 3) : 0;
+        const alpha = isCurrent ? 0.7 : (0.04 + near * 0.15);
+        const size = isCurrent ? 2 : 0.5;
+        ctx.fillStyle = "rgba(180,200,230," + alpha + ")";
+        ctx.beginPath(); ctx.arc(mx, my, size, 0, 6.28); ctx.fill();
+      }
 
-      // the monolith slab — obsidian with subtle vertical grain
-      const slabGrad = ctx.createLinearGradient(slabX, slabY, slabX + slabW, slabY);
-      slabGrad.addColorStop(0, "#0a0a0c");
-      slabGrad.addColorStop(0.3, "#111114");
-      slabGrad.addColorStop(0.5, "#0d0d10");
-      slabGrad.addColorStop(0.7, "#111114");
-      slabGrad.addColorStop(1, "#090910");
-      ctx.fillStyle = slabGrad;
-      ctx.fillRect(slabX, slabY, slabW, slabH);
+      // 12 hour bodies — the current hour glows, others are ghosts
+      const currentHour = Math.floor(hours);
+      for (let i = 0; i < 12; i++) {
+        const ang = (i / 12) * Math.PI * 2 - Math.PI / 2;
+        const hr = R * 0.55;
+        const hx = cx + Math.cos(ang) * hr;
+        const hy = cy + Math.sin(ang) * hr;
+        const isCurH = i === currentHour;
+        // each hour body breathes independently
+        const breath = Math.sin(t * 0.4 + i * 0.52) * 0.3 + 0.7;
+        const alpha = isCurH ? 0.6 * breath : 0.035 * breath;
+        const rad = isCurH ? 4 : 1.5;
 
-      // edge highlights
-      ctx.strokeStyle = "rgba(180,190,210,0.06)";
+        if (isCurH) {
+          const hGlow = ctx.createRadialGradient(hx, hy, 0, hx, hy, rad * 8);
+          hGlow.addColorStop(0, "rgba(255,220,160," + (alpha * 0.4) + ")");
+          hGlow.addColorStop(1, "rgba(0,0,0,0)");
+          ctx.fillStyle = hGlow;
+          ctx.fillRect(hx - rad * 8, hy - rad * 8, rad * 16, rad * 16);
+        }
+
+        ctx.fillStyle = "rgba(220,210,190," + alpha + ")";
+        ctx.beginPath(); ctx.arc(hx, hy, rad, 0, 6.28); ctx.fill();
+      }
+
+      // connecting thread: faint line from center to current second position
+      ctx.strokeStyle = "rgba(120,140,180,0.04)";
       ctx.lineWidth = 0.5;
-      ctx.strokeRect(slabX, slabY, slabW, slabH);
+      ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(sx, sy); ctx.stroke();
 
-      // === TIME AS LIGHT THROUGH CRACKS ===
+      // center: a single dim point
+      ctx.fillStyle = "rgba(200,200,210,0.15)";
+      ctx.beginPath(); ctx.arc(cx, cy, 1, 0, 6.28); ctx.fill();
 
-      // hours: horizontal luminous line — position represents hour (0=top, 12=bottom)
-      const hourY = slabY + (hours / 12) * slabH;
-      const hourGlow = ctx.createLinearGradient(slabX - 20, hourY, slabX + slabW + 20, hourY);
-      hourGlow.addColorStop(0, "rgba(255,200,130,0)");
-      hourGlow.addColorStop(0.15, "rgba(255,200,130,0.5)");
-      hourGlow.addColorStop(0.5, "rgba(255,240,200,0.9)");
-      hourGlow.addColorStop(0.85, "rgba(255,200,130,0.5)");
-      hourGlow.addColorStop(1, "rgba(255,200,130,0)");
-      ctx.fillStyle = hourGlow;
-      ctx.fillRect(slabX - 20, hourY - 1, slabW + 40, 2);
-      // hour glow bloom
-      const hBloom = ctx.createRadialGradient(cx, hourY, 0, cx, hourY, slabW * 1.5);
-      hBloom.addColorStop(0, "rgba(255,210,140,0.08)");
-      hBloom.addColorStop(1, "rgba(0,0,0,0)");
-      ctx.fillStyle = hBloom;
-      ctx.fillRect(cx - slabW * 2, hourY - slabW, slabW * 4, slabW * 2);
-
-      // minutes: a second thinner line
-      const minY = slabY + (minutes / 60) * slabH;
-      const minGlow = ctx.createLinearGradient(slabX, minY, slabX + slabW, minY);
-      minGlow.addColorStop(0, "rgba(160,180,220,0)");
-      minGlow.addColorStop(0.2, "rgba(160,180,220,0.4)");
-      minGlow.addColorStop(0.5, "rgba(200,220,255,0.7)");
-      minGlow.addColorStop(0.8, "rgba(160,180,220,0.4)");
-      minGlow.addColorStop(1, "rgba(160,180,220,0)");
-      ctx.fillStyle = minGlow;
-      ctx.fillRect(slabX, minY - 0.5, slabW, 1);
-
-      // seconds: a descending particle of light
-      const secY = slabY + (seconds / 60) * slabH;
-      const secX = cx + Math.sin(seconds * 0.5) * slabW * 0.15;
+      // the second hand's current position (bright)
+      const sGlow = ctx.createRadialGradient(sx, sy, 0, sx, sy, 12);
+      sGlow.addColorStop(0, "rgba(220,235,255,0.3)");
+      sGlow.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = sGlow;
+      ctx.fillRect(sx - 12, sy - 12, 24, 24);
       ctx.fillStyle = "rgba(255,255,255,0.9)";
-      ctx.beginPath(); ctx.arc(secX, secY, 1.5, 0, 6.28); ctx.fill();
-      // trail behind seconds dot
-      for (let i = 1; i <= 8; i++) {
-        const trailSec = seconds - i * 0.12;
-        const trailY = slabY + (((trailSec % 60) + 60) % 60 / 60) * slabH;
-        const trailX = cx + Math.sin(trailSec * 0.5) * slabW * 0.15;
-        const ta = (1 - i / 9) * 0.3;
-        ctx.fillStyle = "rgba(200,210,240," + ta + ")";
-        ctx.beginPath(); ctx.arc(trailX, trailY, 1, 0, 6.28); ctx.fill();
-      }
-      // seconds glow
-      const sBloom = ctx.createRadialGradient(secX, secY, 0, secX, secY, 15);
-      sBloom.addColorStop(0, "rgba(200,220,255,0.15)");
-      sBloom.addColorStop(1, "rgba(0,0,0,0)");
-      ctx.fillStyle = sBloom;
-      ctx.fillRect(secX - 15, secY - 15, 30, 30);
+      ctx.beginPath(); ctx.arc(sx, sy, 1.5, 0, 6.28); ctx.fill();
 
-      // subtle vertical veins of light within the slab
-      for (let i = 0; i < 5; i++) {
-        const vx = slabX + slabW * (0.15 + i * 0.18);
-        const pulse = Math.sin(t * 0.2 + i * 1.3) * 0.5 + 0.5;
-        const va = pulse * 0.015;
-        ctx.strokeStyle = "rgba(180,200,230," + va + ")";
-        ctx.lineWidth = 0.5;
-        ctx.beginPath();
-        ctx.moveTo(vx, slabY + 10);
-        ctx.lineTo(vx + Math.sin(t * 0.1 + i) * 2, slabY + slabH - 10);
-        ctx.stroke();
-      }
+      // gravitational threads: thin curves connecting hour to minute to second
+      const mAng = (minutes / 60) * Math.PI * 2 - Math.PI / 2;
+      const mR = R * 0.92;
+      const mx = cx + Math.cos(mAng) * mR;
+      const my = cy + Math.sin(mAng) * mR;
+      const hAng = (hours / 12) * Math.PI * 2 - Math.PI / 2;
+      const hR2 = R * 0.55;
+      const hx2 = cx + Math.cos(hAng) * hR2;
+      const hy2 = cy + Math.sin(hAng) * hR2;
 
-      // digital time at bottom — barely visible
-      const timeStr = d.getHours().toString().padStart(2, "0") + ":" +
-                     d.getMinutes().toString().padStart(2, "0");
-      ctx.save();
-      ctx.textAlign = "center";
-      ctx.textBaseline = "top";
-      ctx.font = "200 11px 'Iowan Old Style', Georgia, serif";
-      ctx.fillStyle = "rgba(150,160,180,0.25)";
-      ctx.fillText(timeStr, cx, slabY + slabH + 20);
-      ctx.restore();
+      ctx.strokeStyle = "rgba(150,170,200,0.06)";
+      ctx.lineWidth = 0.5;
+      ctx.beginPath();
+      ctx.moveTo(hx2, hy2);
+      ctx.quadraticCurveTo(cx + Math.sin(t * 0.1) * 10, cy + Math.cos(t * 0.1) * 10, mx, my);
+      ctx.stroke();
+
+      ctx.strokeStyle = "rgba(180,200,230,0.04)";
+      ctx.beginPath();
+      ctx.moveTo(mx, my);
+      ctx.quadraticCurveTo(cx, cy, sx, sy);
+      ctx.stroke();
 
       widgetRAF = requestAnimationFrame(step);
     }
