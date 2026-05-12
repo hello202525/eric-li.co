@@ -1062,9 +1062,14 @@
 
     // ===== WARP STATE =====
     const wStars = [];
-    for (let i = 0; i < 500; i++) wStars.push({ x: (Math.random()-0.5)*4, y: (Math.random()-0.5)*4, z: 0.2+Math.random()*6 });
-    const rings = [];
-    for (let i = 0; i < 12; i++) rings.push({ z: i * 4.2, rot: hash(i+77) * Math.PI });
+    for (let i = 0; i < 400; i++) wStars.push({
+      x: (Math.random()-0.5)*4, y: (Math.random()-0.5)*4,
+      z: 0.2 + Math.random()*6,
+      sz: 0.3 + Math.pow(Math.random(), 3) * 3,
+      hue: Math.random(),
+    });
+    const pulseRings = [];
+    let nextPulse = 1.8;
 
     // ===== CRASH STATE =====
     const cDust = [];
@@ -1239,112 +1244,215 @@
 
     // ======== WARP ========
     function drawWarp(dt) {
-      const dur = 7;
+      const dur = 8;
       const p = Math.min(1, phaseT / dur);
       const cx = W / 2, cy = H / 2;
 
-      // sub-stages: drift (0-0.15), acceleration (0.15-0.4), tunnel (0.4-0.75), mars approach (0.75-1)
-      let speed;
-      if (p < 0.15) speed = 0.5 + p / 0.15 * 1.5;
-      else if (p < 0.4) speed = 2 + ((p - 0.15) / 0.25) * 4;
-      else speed = 6 + (p - 0.4) * 5;
+      // 0-0.06: frozen stars, stillness before the jump
+      // 0.06-0.12: THE PUNCH — sudden violent acceleration
+      // 0.12-0.65: full warp — streaks, pulses, color journey
+      // 0.65-0.82: the void between — stars thin out, darkness deepens
+      // 0.82-1.0: mars materializes from warmth
 
-      // background darkens
-      const bg = Math.floor(3 + p * 15);
-      ctx.fillStyle = "rgb(" + bg + "," + Math.floor(bg * 0.7) + "," + Math.floor(bg * 1.2) + ")";
+      let speed;
+      if (p < 0.06) speed = 0.08;
+      else if (p < 0.12) speed = 0.08 + Math.pow((p - 0.06) / 0.06, 2) * 14;
+      else if (p < 0.65) speed = 9 + (p - 0.12) * 8;
+      else if (p < 0.82) speed = 9 - (p - 0.65) * 30;
+      else speed = Math.max(0.5, 4 - (p - 0.82) * 20);
+
+      // background — deep space
+      ctx.fillStyle = "#010103";
       ctx.fillRect(0, 0, W, H);
 
-      // color journey: cool white → deep blue → violet → warm amber
+      // color journey: cold white → electric blue → violet → deep red-amber
       let cr, cg, cb;
-      if (p < 0.2) {
-        cr = 210; cg = 225; cb = 255;
-      } else if (p < 0.45) {
-        const t = (p - 0.2) / 0.25;
-        cr = Math.floor(210 - t * 100); cg = Math.floor(225 - t * 110); cb = Math.floor(255 - t * 30);
-      } else if (p < 0.7) {
-        const t = (p - 0.45) / 0.25;
-        cr = Math.floor(110 + t * 90); cg = Math.floor(115 - t * 70); cb = Math.floor(225 - t * 100);
+      if (p < 0.12) {
+        cr = 200; cg = 215; cb = 255;
+      } else if (p < 0.3) {
+        const t = (p - 0.12) / 0.18;
+        cr = Math.floor(200 - t * 140); cg = Math.floor(215 - t * 80); cb = 255;
+      } else if (p < 0.5) {
+        const t = (p - 0.3) / 0.2;
+        cr = Math.floor(60 + t * 100); cg = Math.floor(135 - t * 100); cb = Math.floor(255 - t * 80);
+      } else if (p < 0.65) {
+        const t = (p - 0.5) / 0.15;
+        cr = Math.floor(160 + t * 60); cg = Math.floor(35 + t * 40); cb = Math.floor(175 - t * 120);
       } else {
-        const t = (p - 0.7) / 0.3;
-        cr = Math.floor(200 + t * 30); cg = Math.floor(45 + t * 55); cb = Math.floor(125 - t * 100);
+        const t = Math.min(1, (p - 0.65) / 0.2);
+        cr = Math.floor(220 - t * 20); cg = Math.floor(75 + t * 30); cb = Math.floor(55 - t * 30);
       }
 
-      // tunnel rings only appear in tunnel phase
-      if (p > 0.35) {
-        const ringAlpha = Math.min(1, (p - 0.35) / 0.1);
-        for (const ring of rings) {
-          ring.z -= speed * dt;
-          ring.rot += dt * 0.12;
-          if (ring.z < 0.1) { ring.z += 48; ring.rot = Math.random() * Math.PI; }
-          const s = 350 / (350 + ring.z * 55);
-          const rr = Math.min(W, H) * 0.9 * s;
-          if (rr < 2) continue;
-          const ra = Math.min(0.15, s * 0.15) * ringAlpha * (1 - Math.max(0, p - 0.8) * 3);
-          ctx.strokeStyle = "rgba(" + cr + "," + cg + "," + cb + "," + ra + ")";
-          ctx.lineWidth = Math.max(0.4, s * 2);
-          ctx.beginPath();
-          for (let j = 0; j <= 6; j++) {
-            const a = ring.rot + (j / 6) * Math.PI * 2;
-            const px = cx + Math.cos(a) * rr, py = cy + Math.sin(a) * rr;
-            j === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
-          }
-          ctx.stroke();
-        }
+      // === THE PUNCH — central flash ===
+      if (p > 0.05 && p < 0.18) {
+        const fp = (p - 0.05) / 0.13;
+        const flashA = fp < 0.25 ? fp / 0.25 : Math.max(0, 1 - (fp - 0.25) / 0.75);
+        const flashR = 20 + fp * W * 0.25;
+        const flash = ctx.createRadialGradient(cx, cy, 0, cx, cy, flashR);
+        flash.addColorStop(0, "rgba(220,235,255," + (flashA * 0.8) + ")");
+        flash.addColorStop(0.4, "rgba(140,180,255," + (flashA * 0.3) + ")");
+        flash.addColorStop(1, "rgba(80,120,200,0)");
+        ctx.fillStyle = flash;
+        ctx.fillRect(0, 0, W, H);
       }
 
-      // stars
+      // === CENTRAL VOID — dark eye with luminous corona ===
+      if (p > 0.12 && p < 0.82) {
+        const vi = Math.min(1, (p - 0.12) / 0.15) * (p < 0.7 ? 1 : Math.max(0, (0.82 - p) / 0.12));
+        const innerR = W * 0.02;
+        const outerR = W * 0.18;
+        const corona = ctx.createRadialGradient(cx, cy, innerR, cx, cy, outerR);
+        corona.addColorStop(0, "rgba(0,0,5," + (vi * 0.5) + ")");
+        corona.addColorStop(0.5, "rgba(" + cr + "," + cg + "," + cb + "," + (vi * 0.12) + ")");
+        corona.addColorStop(0.8, "rgba(" + Math.floor(cr*0.5) + "," + Math.floor(cg*0.3) + "," + Math.floor(cb*0.6) + "," + (vi * 0.05) + ")");
+        corona.addColorStop(1, "rgba(0,0,0,0)");
+        ctx.fillStyle = corona;
+        ctx.fillRect(0, 0, W, H);
+      }
+
+      // === STARS — with size variation and close-pass flashes ===
+      const starFade = p > 0.65 ? Math.max(0, 1 - (p - 0.65) / 0.15) : 1;
       for (const s of wStars) {
         s.z -= speed * dt;
-        if (s.z < 0.05) { s.x = (Math.random()-0.5)*4; s.y = (Math.random()-0.5)*4; s.z = 5 + Math.random()*1.5; }
+        if (s.z < 0.04) {
+          s.x = (Math.random() - 0.5) * 4;
+          s.y = (Math.random() - 0.5) * 4;
+          s.z = 5.5 + Math.random() * 1.5;
+          s.sz = 0.3 + Math.pow(Math.random(), 3) * 3;
+        }
         const px = cx + (s.x / s.z) * W * 0.5;
         const py = cy + (s.y / s.z) * H * 0.5;
-        if (px < -30 || px > W + 30 || py < -30 || py > H + 30) continue;
-        const pxP = cx + (s.x / (s.z + speed * dt * 2.5)) * W * 0.5;
-        const pyP = cy + (s.y / (s.z + speed * dt * 2.5)) * H * 0.5;
-        const bright = Math.min(1, 0.5 / s.z);
-        const len = Math.hypot(px - pxP, py - pyP);
-        if (len > 1) {
-          ctx.strokeStyle = "rgba(" + cr + "," + cg + "," + cb + "," + bright + ")";
-          ctx.lineWidth = Math.max(0.4, 2 / s.z);
-          ctx.beginPath(); ctx.moveTo(pxP, pyP); ctx.lineTo(px, py); ctx.stroke();
+        if (px < -40 || px > W + 40 || py < -40 || py > H + 40) continue;
+
+        const bright = Math.min(1, 0.4 / s.z) * starFade;
+        if (bright < 0.01) continue;
+
+        // close-pass flash for large stars
+        if (s.z < 0.25 && s.sz > 1.8 && starFade > 0.5) {
+          const flashI = (0.25 - s.z) / 0.25;
+          const fr = 15 + flashI * 50;
+          const fg = ctx.createRadialGradient(px, py, 0, px, py, fr);
+          fg.addColorStop(0, "rgba(255,255,255," + (flashI * 0.25 * starFade) + ")");
+          fg.addColorStop(1, "rgba(" + cr + "," + cg + "," + cb + ",0)");
+          ctx.fillStyle = fg;
+          ctx.fillRect(px - fr, py - fr, fr * 2, fr * 2);
+        }
+
+        if (speed > 0.5) {
+          const tailMul = 2 + s.sz * 0.8;
+          const pxP = cx + (s.x / (s.z + speed * dt * tailMul)) * W * 0.5;
+          const pyP = cy + (s.y / (s.z + speed * dt * tailMul)) * H * 0.5;
+          const len = Math.hypot(px - pxP, py - pyP);
+          if (len > 1) {
+            ctx.strokeStyle = "rgba(" + cr + "," + cg + "," + cb + "," + bright + ")";
+            ctx.lineWidth = Math.max(0.3, s.sz * 0.8 / s.z);
+            ctx.beginPath(); ctx.moveTo(pxP, pyP); ctx.lineTo(px, py); ctx.stroke();
+          } else {
+            ctx.fillStyle = "rgba(" + cr + "," + cg + "," + cb + "," + (bright * 0.5) + ")";
+            ctx.fillRect(px - 0.5, py - 0.5, 1, 1);
+          }
         } else {
-          ctx.fillStyle = "rgba(" + cr + "," + cg + "," + cb + "," + (bright * 0.6) + ")";
-          ctx.fillRect(px - 0.5, py - 0.5, 1, 1);
+          ctx.fillStyle = "rgba(" + cr + "," + cg + "," + cb + "," + bright + ")";
+          ctx.beginPath(); ctx.arc(px, py, Math.max(0.3, s.sz * 0.4), 0, Math.PI * 2); ctx.fill();
         }
       }
 
-      // nebula wisps
-      if (p > 0.2) {
-        for (let i = 0; i < 3; i++) {
-          const nx = cx + Math.sin(phaseT * 0.18 + i * 2.3) * W * 0.35;
-          const ny = cy + Math.cos(phaseT * 0.25 + i * 3.5) * H * 0.3;
-          const nr = 80 + p * 200;
+      // === PULSE RINGS — expand from center like shockwaves ===
+      if (p > 0.15 && p < 0.75) {
+        nextPulse -= dt;
+        if (nextPulse <= 0) {
+          pulseRings.push({ r: 0, a: 0.2 + Math.random() * 0.15 });
+          nextPulse = 0.7 + Math.random() * 0.8;
+        }
+      }
+      for (let i = pulseRings.length - 1; i >= 0; i--) {
+        const ring = pulseRings[i];
+        ring.r += dt * W * 0.35;
+        ring.a *= Math.pow(0.4, dt * 2);
+        if (ring.a < 0.005 || ring.r > W) { pulseRings.splice(i, 1); continue; }
+        ctx.strokeStyle = "rgba(" + cr + "," + cg + "," + cb + "," + ring.a + ")";
+        ctx.lineWidth = 1.2;
+        ctx.beginPath(); ctx.arc(cx, cy, ring.r, 0, Math.PI * 2); ctx.stroke();
+      }
+
+      // === ANAMORPHIC LENS STREAK — horizontal light through center ===
+      if (p > 0.1 && p < 0.8) {
+        const lensI = Math.min(1, (p - 0.1) / 0.1) * (p < 0.72 ? 1 : Math.max(0, (0.8 - p) / 0.08));
+        const lensA = lensI * 0.1;
+        const lensGrad = ctx.createLinearGradient(0, cy, W, cy);
+        lensGrad.addColorStop(0, "rgba(" + cr + "," + cg + "," + cb + ",0)");
+        lensGrad.addColorStop(0.2, "rgba(" + cr + "," + cg + "," + cb + "," + (lensA * 0.4) + ")");
+        lensGrad.addColorStop(0.45, "rgba(255,255,255," + (lensA * 1.2) + ")");
+        lensGrad.addColorStop(0.55, "rgba(255,255,255," + (lensA * 1.2) + ")");
+        lensGrad.addColorStop(0.8, "rgba(" + cr + "," + cg + "," + cb + "," + (lensA * 0.4) + ")");
+        lensGrad.addColorStop(1, "rgba(" + cr + "," + cg + "," + cb + ",0)");
+        ctx.fillStyle = lensGrad;
+        ctx.fillRect(0, cy - 1.5, W, 3);
+
+        // wider soft glow band
+        ctx.fillStyle = lensGrad;
+        ctx.globalAlpha = 0.3;
+        ctx.fillRect(0, cy - 8, W, 16);
+        ctx.globalAlpha = 1;
+      }
+
+      // === NEBULA CLOUDS — drift through colored gas ===
+      if (p > 0.18 && p < 0.75) {
+        const nebI = Math.min(1, (p - 0.18) / 0.1) * (p < 0.65 ? 1 : Math.max(0, (0.75 - p) / 0.1));
+        for (let i = 0; i < 2; i++) {
+          const nx = cx + Math.sin(phaseT * 0.15 + i * 3.7) * W * 0.4;
+          const ny = cy + Math.cos(phaseT * 0.2 + i * 2.3) * H * 0.35;
+          const nr = 100 + p * 180;
           const nGrad = ctx.createRadialGradient(nx, ny, 0, nx, ny, nr);
-          const na = (p - 0.2) * 0.04;
-          nGrad.addColorStop(0, "rgba(" + Math.floor(cr*0.7) + "," + Math.floor(cg*0.5+30) + ",60," + na + ")");
-          nGrad.addColorStop(1, "rgba(" + cr + "," + cg + ",50,0)");
+          nGrad.addColorStop(0, "rgba(" + Math.floor(cr * 0.6) + "," + Math.floor(cg * 0.4 + 20) + "," + Math.floor(cb * 0.5) + "," + (nebI * 0.05) + ")");
+          nGrad.addColorStop(1, "rgba(0,0,0,0)");
           ctx.fillStyle = nGrad;
           ctx.fillRect(0, 0, W, H);
         }
       }
 
-      // vignette
-      const vig = ctx.createRadialGradient(cx, cy, W * 0.1, cx, cy, W * 0.7);
-      vig.addColorStop(0, "rgba(0,0,0,0)");
-      vig.addColorStop(1, "rgba(0,0,0," + (0.35 + p * 0.2) + ")");
-      ctx.fillStyle = vig; ctx.fillRect(0, 0, W, H);
+      // === THE VOID — stars gone, deep darkness, just faint color ===
+      if (p > 0.68 && p < 0.84) {
+        const voidI = Math.min(1, (p - 0.68) / 0.06) * (p < 0.78 ? 1 : Math.max(0, (0.84 - p) / 0.06));
+        ctx.fillStyle = "rgba(0,0,3," + (voidI * 0.3) + ")";
+        ctx.fillRect(0, 0, W, H);
+      }
 
-      // mars approach
-      if (p > 0.8) {
-        const mp = (p - 0.8) / 0.2;
-        const mr = mp * Math.min(W, H) * 0.8;
+      // === VIGNETTE ===
+      const vigR = W * (0.7 - p * 0.15);
+      const vig = ctx.createRadialGradient(cx, cy, vigR * 0.2, cx, cy, vigR);
+      vig.addColorStop(0, "rgba(0,0,0,0)");
+      vig.addColorStop(1, "rgba(0,0,0," + (0.4 + p * 0.15) + ")");
+      ctx.fillStyle = vig;
+      ctx.fillRect(0, 0, W, H);
+
+      // === MARS APPROACH — warmth emerging from the void ===
+      if (p > 0.82) {
+        const mp = (p - 0.82) / 0.18;
+        const mr = mp * Math.min(W, H) * 0.85;
         const mGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(1, mr));
-        mGrad.addColorStop(0, "rgba(170,65,30," + (mp * 0.9) + ")");
-        mGrad.addColorStop(0.3, "rgba(140,50,25," + (mp * 0.7) + ")");
-        mGrad.addColorStop(0.65, "rgba(100,35,18," + (mp * 0.4) + ")");
-        mGrad.addColorStop(1, "rgba(50,18,10,0)");
+        mGrad.addColorStop(0, "rgba(180,70,32," + (mp * 0.95) + ")");
+        mGrad.addColorStop(0.25, "rgba(150,55,25," + (mp * 0.75) + ")");
+        mGrad.addColorStop(0.5, "rgba(110,38,18," + (mp * 0.5) + ")");
+        mGrad.addColorStop(0.8, "rgba(60,20,10," + (mp * 0.2) + ")");
+        mGrad.addColorStop(1, "rgba(30,10,5,0)");
         ctx.fillStyle = mGrad;
         ctx.beginPath(); ctx.arc(cx, cy, mr, 0, Math.PI * 2); ctx.fill();
+
+        // surface detail on mars (subtle radial lines)
+        if (mp > 0.3) {
+          const dAlpha = (mp - 0.3) * 0.06;
+          for (let i = 0; i < 8; i++) {
+            const ang = hash(i * 137) * Math.PI * 2;
+            const len = mr * (0.3 + hash(i * 53) * 0.5);
+            ctx.strokeStyle = "rgba(120,45,20," + dAlpha + ")";
+            ctx.lineWidth = 1 + mp * 2;
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+            ctx.lineTo(cx + Math.cos(ang) * len, cy + Math.sin(ang) * len);
+            ctx.stroke();
+          }
+        }
       }
 
       if (phaseT >= dur && !fadeCallback) fadeTo("crash");
