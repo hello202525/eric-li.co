@@ -1088,32 +1088,23 @@
     });
 
     const debris = [];
-    for (let i = 0; i < 90; i++) {
+    for (let i = 0; i < 100; i++) {
       const zone = hash(i * 73);
-      const nv = 3 + Math.floor(hash(i * 37) * 4);
-      const sz = 4 + hash(i * 29) * (zone < 0.3 ? 18 : zone < 0.6 ? 30 : 10);
-      const verts = [];
-      for (let v = 0; v < nv; v++) {
-        const a = (v / nv) * 6.28;
-        const rad = 0.5 + hash(i * 17 + v * 41) * 0.5;
-        verts.push({ dx: Math.cos(a) * sz * rad, dy: Math.sin(a) * sz * rad * (0.6 + hash(i * 7 + v) * 0.4) });
-      }
+      const sz = 0.5 + hash(i * 29) * (zone < 0.3 ? 4 : zone < 0.6 ? 6 : 2);
+      const warm = hash(i * 41);
       debris.push({
         x: (hash(i * 53) - 0.5) * 5,
         y: (hash(i * 67) - 0.5) * 4,
-        z: 2 + hash(i * 83) * 45,
-        sz, verts,
-        rot: hash(i * 11) * 6.28,
-        rotSpd: (hash(i * 19) - 0.5) * 0.4,
-        zone,
+        z: 1.5 + hash(i * 83) * 45,
+        sz, zone, warm,
       });
     }
 
     const closePasses = [
-      { z: 8, x: 0.8, y: -0.3, sz: 80, nv: 5, seed: 7 },
-      { z: 20, x: -0.6, y: 0.5, sz: 100, nv: 6, seed: 13 },
-      { z: 34, x: 0.4, y: -0.6, sz: 70, nv: 4, seed: 29 },
-      { z: 44, x: -0.9, y: 0.2, sz: 90, nv: 7, seed: 37 },
+      { z: 8, x: 0.7, y: -0.2, sz: 60 },
+      { z: 20, x: -0.5, y: 0.4, sz: 80 },
+      { z: 34, x: 0.3, y: -0.5, sz: 55 },
+      { z: 44, x: -0.8, y: 0.15, sz: 70 },
     ];
 
     const bokeh = [];
@@ -1620,103 +1611,75 @@
         ctx.fillRect(0, 0, W, H);
       }
 
-      // --- DEBRIS + ASTEROIDS (projected from 3D) ---
+      // --- DEBRIS (dots + soft glows, no polygons) ---
       const FOV = 200;
       let closeShake = 0;
-      const drawObjs = [];
+
       for (const d of debris) {
         const relZ = d.z - (driftZ % 48);
         const wz = relZ < 0.5 ? relZ + 48 : relZ;
-        if (wz > 20) continue;
-        const zoneP = d.zone;
-        let visible = true;
-        if (zoneP < 0.3 && progress > 0.4) visible = false;
-        if (zoneP >= 0.3 && zoneP < 0.6 && progress > 0.55) visible = false;
-        if (zoneP >= 0.6 && progress < 0.2) visible = false;
-        if (zoneP >= 0.6 && progress > 0.5) visible = false;
-        if (progress > 0.55 && progress < 0.85 && zoneP > 0.08) visible = false;
-        if (!visible) continue;
-        drawObjs.push({ o: d, wz, type: "debris" });
+        if (wz > 18) continue;
+        const zp = d.zone;
+        if (zp < 0.3 && progress > 0.4) continue;
+        if (zp >= 0.3 && zp < 0.6 && progress > 0.55) continue;
+        if (zp >= 0.6 && (progress < 0.2 || progress > 0.5)) continue;
+        if (progress > 0.55 && progress < 0.85 && zp > 0.08) continue;
+
+        const sc = FOV / wz;
+        const sx = cx + (d.x - P.x * 0.3) * sc;
+        const sy = cy + (d.y - P.y * 0.3) * sc;
+        if (sx < -30 || sx > W + 30 || sy < -30 || sy > H + 30) continue;
+
+        const fog = Math.min(0.9, wz / 16);
+        const r = d.sz * sc * 0.5;
+
+        if (r < 3) {
+          let cr, cg, cb;
+          if (progress < 0.3) { cr = 180 + d.warm * 60; cg = 100 + d.warm * 40; cb = 60 + d.warm * 30; }
+          else if (progress < 0.6) { cr = 160; cg = 155; cb = 150; }
+          else { cr = 120; cg = 130; cb = 160; }
+          ctx.fillStyle = "rgba(" + Math.floor(cr) + "," + Math.floor(cg) + "," + Math.floor(cb) + "," + ((1 - fog) * 0.6) + ")";
+          ctx.beginPath(); ctx.arc(sx, sy, Math.max(0.3, r), 0, 6.28); ctx.fill();
+        } else {
+          const gr = Math.max(2, r);
+          const grd = ctx.createRadialGradient(sx, sy, 0, sx, sy, gr);
+          let cr, cg, cb;
+          if (progress < 0.3) { cr = 160 + d.warm * 50; cg = 80 + d.warm * 30; cb = 40 + d.warm * 20; }
+          else if (progress < 0.6) { cr = 140; cg = 135; cb = 130; }
+          else { cr = 100; cg = 110; cb = 140; }
+          const a = (1 - fog) * 0.45;
+          grd.addColorStop(0, "rgba(" + Math.floor(cr) + "," + Math.floor(cg) + "," + Math.floor(cb) + "," + a + ")");
+          grd.addColorStop(0.5, "rgba(" + Math.floor(cr * 0.6) + "," + Math.floor(cg * 0.6) + "," + Math.floor(cb * 0.6) + "," + (a * 0.4) + ")");
+          grd.addColorStop(1, "rgba(" + Math.floor(cr * 0.3) + "," + Math.floor(cg * 0.3) + "," + Math.floor(cb * 0.3) + ",0)");
+          ctx.fillStyle = grd;
+          ctx.fillRect(sx - gr, sy - gr, gr * 2, gr * 2);
+        }
       }
 
+      // close-pass shadows (soft dark circles, not polygons)
       for (const cp of closePasses) {
         const relZ = cp.z - (driftZ % 48);
-        const wz = relZ < 0.5 ? relZ + 48 : relZ;
-        if (wz > 12 || wz < 0.15) continue;
-        drawObjs.push({ o: cp, wz, type: "close" });
-      }
+        const wz = relZ < 0.15 ? relZ + 48 : relZ;
+        if (wz > 10) continue;
+        const sc2 = FOV / Math.max(0.1, wz);
+        const sx = cx + cp.x * sc2 * 0.4;
+        const sy = cy + cp.y * sc2 * 0.4;
+        const r = cp.sz * sc2 * 0.04;
+        if (r < 2) continue;
 
-      drawObjs.sort((a, b) => b.wz - a.wz);
+        if (wz < 2.5) closeShake = Math.max(closeShake, (2.5 - wz) / 2.5);
 
-      for (const item of drawObjs) {
-        const wz = item.wz;
-        const sc = FOV / wz;
+        const grd = ctx.createRadialGradient(sx, sy, r * 0.2, sx, sy, r);
+        const a = Math.min(0.6, r / 200);
+        grd.addColorStop(0, "rgba(3,2,2," + a + ")");
+        grd.addColorStop(0.6, "rgba(3,2,2," + (a * 0.4) + ")");
+        grd.addColorStop(1, "rgba(3,2,2,0)");
+        ctx.fillStyle = grd;
+        ctx.fillRect(sx - r, sy - r, r * 2, r * 2);
 
-        if (item.type === "debris") {
-          const d = item.o;
-          const sx = cx + (d.x - P.x * 0.3) * sc;
-          const sy = cy + (d.y - P.y * 0.3) * sc;
-          if (sx < -100 || sx > W + 100 || sy < -100 || sy > H + 100) continue;
-
-          const fog = Math.min(0.85, wz / 18);
-          const rot = d.rot + phaseT * d.rotSpd;
-          const cosR = Math.cos(rot), sinR = Math.sin(rot);
-
-          let r, g, b;
-          if (progress < 0.3) { r = 60 + hash(d.zone * 100) * 40; g = 25 + hash(d.zone * 200) * 15; b = 15 + hash(d.zone * 300) * 10; }
-          else if (progress < 0.6) { r = 50; g = 45; b = 42; }
-          else { r = 30; g = 28; b = 35; }
-          const a = (1 - fog) * 0.75;
-          ctx.fillStyle = "rgba(" + r + "," + g + "," + b + "," + a + ")";
-
-          ctx.beginPath();
-          for (let v = 0; v < d.verts.length; v++) {
-            const vx = d.verts[v].dx * cosR - d.verts[v].dy * sinR;
-            const vy = d.verts[v].dx * sinR + d.verts[v].dy * cosR;
-            const px = sx + vx * sc;
-            const py = sy + vy * sc;
-            v === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
-          }
-          ctx.closePath(); ctx.fill();
-
-          // metallic glint on larger debris
-          if (d.sz > 12 && fog < 0.5) {
-            const glint = Math.pow(Math.max(0, Math.sin(phaseT * 0.8 + d.rot * 3)), 8) * (1 - fog) * 0.25;
-            if (glint > 0.02) {
-              ctx.fillStyle = "rgba(230,225,215," + glint + ")";
-              ctx.beginPath(); ctx.arc(sx, sy, d.sz * sc * 0.15, 0, 6.28); ctx.fill();
-            }
-          }
-        }
-
-        if (item.type === "close") {
-          const cp = item.o;
-          if (wz > 8) continue;
-          const sc2 = FOV / Math.max(0.15, wz);
-          const sx = cx + cp.x * sc2 * 0.5;
-          const sy = cy + cp.y * sc2 * 0.5;
-          const objSz = cp.sz * sc2 * 0.05;
-          if (objSz < 2) continue;
-
-          if (wz < 2) closeShake = Math.max(closeShake, (2 - wz) / 2);
-
-          const a = Math.min(0.75, objSz / 250);
-          ctx.fillStyle = "rgba(6,5,4," + a + ")";
-          ctx.beginPath();
-          const rot = phaseT * 0.1 + cp.seed;
-          for (let v = 0; v < cp.nv; v++) {
-            const ang = (v / cp.nv) * 6.28 + rot;
-            const rad = objSz * (0.6 + hash(cp.seed * 13 + v * 41) * 0.4);
-            const px = sx + Math.cos(ang) * rad;
-            const py = sy + Math.sin(ang) * rad;
-            v === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
-          }
-          ctx.closePath(); ctx.fill();
-
-          if (wz < 3 && objSz > 30) {
-            ctx.fillStyle = "rgba(6,5,4," + (a * 0.15) + ")";
-            ctx.fillRect(0, 0, W, H);
-          }
+        if (wz < 3 && r > 30) {
+          ctx.fillStyle = "rgba(0,0,0," + (a * 0.1) + ")";
+          ctx.fillRect(0, 0, W, H);
         }
       }
 
