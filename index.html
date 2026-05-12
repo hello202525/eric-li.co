@@ -1095,191 +1095,134 @@
       });
   }
 
-  // === Watch Face ("time" command) ===
+  // === Time: dark monolith with light bleeding through ===
   function runTime() {
     const ctx = sizeWidgetCanvas();
-    const w = innerWidth, h = innerHeight;
+    const W = innerWidth, H = innerHeight;
     document.body.classList.add("time-mode");
     $widgetCanvas.classList.add("show");
-
-    const cx = w / 2, cy = h / 2;
-    const dialR = Math.min(w, h) * 0.35;
     let startT = performance.now();
-
-    // precompute noise grid for fumé texture
-    const noiseGrid = [];
-    const NG = 64;
-    for (let i = 0; i < NG * NG; i++) noiseGrid[i] = Math.random();
-    function sampleNoise(x, y) {
-      const xi = ((x % NG) + NG) % NG, yi = ((y % NG) + NG) % NG;
-      const x0 = Math.floor(xi), y0 = Math.floor(yi);
-      const fx = xi - x0, fy = yi - y0;
-      const sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
-      const n00 = noiseGrid[(y0 % NG) * NG + (x0 % NG)];
-      const n10 = noiseGrid[(y0 % NG) * NG + ((x0 + 1) % NG)];
-      const n01 = noiseGrid[((y0 + 1) % NG) * NG + (x0 % NG)];
-      const n11 = noiseGrid[((y0 + 1) % NG) * NG + ((x0 + 1) % NG)];
-      return n00 * (1-sx) * (1-sy) + n10 * sx * (1-sy) + n01 * (1-sx) * sy + n11 * sx * sy;
-    }
-    function fbm(x, y, octaves) {
-      let v = 0, a = 0.5, f = 1;
-      for (let i = 0; i < octaves; i++) { v += a * sampleNoise(x * f, y * f); a *= 0.5; f *= 2.1; }
-      return v;
-    }
 
     function step(now) {
       if (activeWidget !== "time") return;
-      const elapsed = (now - startT) / 1000;
+      const t = (now - startT) / 1000;
       const d = new Date();
       const hours = d.getHours() % 12 + d.getMinutes() / 60;
       const minutes = d.getMinutes() + d.getSeconds() / 60;
       const seconds = d.getSeconds() + d.getMilliseconds() / 1000;
 
-      ctx.clearRect(0, 0, w, h);
+      ctx.clearRect(0, 0, W, H);
 
-      // dark background
-      ctx.fillStyle = "#080808";
-      ctx.fillRect(0, 0, w, h);
+      // void background
+      ctx.fillStyle = "#050506";
+      ctx.fillRect(0, 0, W, H);
 
-      // === CASE (outer ring) ===
-      ctx.save();
-      ctx.beginPath();
-      ctx.arc(cx, cy, dialR * 1.08, 0, Math.PI * 2);
-      const caseGrad = ctx.createLinearGradient(cx - dialR, cy - dialR, cx + dialR, cy + dialR);
-      caseGrad.addColorStop(0, "#2a2a2a");
-      caseGrad.addColorStop(0.3, "#404040");
-      caseGrad.addColorStop(0.5, "#555");
-      caseGrad.addColorStop(0.7, "#3a3a3a");
-      caseGrad.addColorStop(1, "#222");
-      ctx.fillStyle = caseGrad;
-      ctx.fill();
+      const cx = W / 2, cy = H / 2;
+      // monolith dimensions — tall narrow slab
+      const slabW = Math.min(W * 0.12, 120);
+      const slabH = Math.min(H * 0.7, 500);
+      const slabX = cx - slabW / 2;
+      const slabY = cy - slabH / 2;
 
-      // === DIAL: fumé gradient with animated noise displacement ===
-      ctx.beginPath();
-      ctx.arc(cx, cy, dialR, 0, Math.PI * 2);
-      ctx.clip();
+      // ambient glow behind monolith — shifts color slowly
+      const hue = 200 + Math.sin(t * 0.05) * 30;
+      const ambR = slabH * 0.7;
+      const amb = ctx.createRadialGradient(cx, cy, slabW, cx, cy, ambR);
+      amb.addColorStop(0, "hsla(" + hue + ",40%,20%,0.12)");
+      amb.addColorStop(0.5, "hsla(" + hue + ",30%,12%,0.05)");
+      amb.addColorStop(1, "hsla(" + hue + ",20%,5%,0)");
+      ctx.fillStyle = amb;
+      ctx.fillRect(cx - ambR, cy - ambR, ambR * 2, ambR * 2);
 
-      // base fumé: sunburst radial gradient from copper-bronze center to midnight blue edges
-      const colorT = (Math.sin(elapsed * 0.08) + 1) * 0.5;
-      const innerR = Math.floor(40 + colorT * 30);
-      const innerG = Math.floor(30 + colorT * 15);
-      const innerB = Math.floor(25 + colorT * 10);
-      const outerR = Math.floor(8 + (1 - colorT) * 15);
-      const outerG = Math.floor(10 + (1 - colorT) * 12);
-      const outerB = Math.floor(30 + (1 - colorT) * 25);
+      // the monolith slab — obsidian with subtle vertical grain
+      const slabGrad = ctx.createLinearGradient(slabX, slabY, slabX + slabW, slabY);
+      slabGrad.addColorStop(0, "#0a0a0c");
+      slabGrad.addColorStop(0.3, "#111114");
+      slabGrad.addColorStop(0.5, "#0d0d10");
+      slabGrad.addColorStop(0.7, "#111114");
+      slabGrad.addColorStop(1, "#090910");
+      ctx.fillStyle = slabGrad;
+      ctx.fillRect(slabX, slabY, slabW, slabH);
 
-      const dialGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, dialR);
-      dialGrad.addColorStop(0, "rgb(" + innerR + "," + innerG + "," + innerB + ")");
-      dialGrad.addColorStop(0.3, "rgb(" + Math.floor(innerR*0.7+outerR*0.3) + "," + Math.floor(innerG*0.7+outerG*0.3) + "," + Math.floor(innerB*0.7+outerB*0.3) + ")");
-      dialGrad.addColorStop(0.7, "rgb(" + Math.floor(innerR*0.3+outerR*0.7) + "," + Math.floor(innerG*0.3+outerG*0.7) + "," + Math.floor(innerB*0.3+outerB*0.7) + ")");
-      dialGrad.addColorStop(1, "rgb(" + outerR + "," + outerG + "," + outerB + ")");
-      ctx.fillStyle = dialGrad;
-      ctx.fillRect(cx - dialR, cy - dialR, dialR * 2, dialR * 2);
+      // edge highlights
+      ctx.strokeStyle = "rgba(180,190,210,0.06)";
+      ctx.lineWidth = 0.5;
+      ctx.strokeRect(slabX, slabY, slabW, slabH);
 
-      // fumé smoke texture (layered noise displacement)
-      const smokeRes = 80;
-      const cellW = (dialR * 2) / smokeRes;
-      for (let yi = 0; yi < smokeRes; yi++) {
-        for (let xi = 0; xi < smokeRes; xi++) {
-          const px = cx - dialR + xi * cellW;
-          const py = cy - dialR + yi * cellW;
-          const dx = px - cx, dy = py - cy;
-          if (dx * dx + dy * dy > dialR * dialR) continue;
-          const n = fbm(xi * 0.15 + elapsed * 0.02, yi * 0.15 + elapsed * 0.015, 4);
-          const sunburstAng = Math.atan2(dy, dx);
-          const sunburst = (Math.sin(sunburstAng * 12 + n * 8) + 1) * 0.5;
-          const distFromCenter = Math.sqrt(dx * dx + dy * dy) / dialR;
-          const smokeA = (n * 0.3 + sunburst * 0.15) * (0.3 + distFromCenter * 0.5);
-          if (smokeA < 0.02) continue;
-          ctx.fillStyle = "rgba(0,0,0," + Math.min(0.4, smokeA) + ")";
-          ctx.fillRect(px, py, cellW + 0.5, cellW + 0.5);
-        }
+      // === TIME AS LIGHT THROUGH CRACKS ===
+
+      // hours: horizontal luminous line — position represents hour (0=top, 12=bottom)
+      const hourY = slabY + (hours / 12) * slabH;
+      const hourGlow = ctx.createLinearGradient(slabX - 20, hourY, slabX + slabW + 20, hourY);
+      hourGlow.addColorStop(0, "rgba(255,200,130,0)");
+      hourGlow.addColorStop(0.15, "rgba(255,200,130,0.5)");
+      hourGlow.addColorStop(0.5, "rgba(255,240,200,0.9)");
+      hourGlow.addColorStop(0.85, "rgba(255,200,130,0.5)");
+      hourGlow.addColorStop(1, "rgba(255,200,130,0)");
+      ctx.fillStyle = hourGlow;
+      ctx.fillRect(slabX - 20, hourY - 1, slabW + 40, 2);
+      // hour glow bloom
+      const hBloom = ctx.createRadialGradient(cx, hourY, 0, cx, hourY, slabW * 1.5);
+      hBloom.addColorStop(0, "rgba(255,210,140,0.08)");
+      hBloom.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = hBloom;
+      ctx.fillRect(cx - slabW * 2, hourY - slabW, slabW * 4, slabW * 2);
+
+      // minutes: a second thinner line
+      const minY = slabY + (minutes / 60) * slabH;
+      const minGlow = ctx.createLinearGradient(slabX, minY, slabX + slabW, minY);
+      minGlow.addColorStop(0, "rgba(160,180,220,0)");
+      minGlow.addColorStop(0.2, "rgba(160,180,220,0.4)");
+      minGlow.addColorStop(0.5, "rgba(200,220,255,0.7)");
+      minGlow.addColorStop(0.8, "rgba(160,180,220,0.4)");
+      minGlow.addColorStop(1, "rgba(160,180,220,0)");
+      ctx.fillStyle = minGlow;
+      ctx.fillRect(slabX, minY - 0.5, slabW, 1);
+
+      // seconds: a descending particle of light
+      const secY = slabY + (seconds / 60) * slabH;
+      const secX = cx + Math.sin(seconds * 0.5) * slabW * 0.15;
+      ctx.fillStyle = "rgba(255,255,255,0.9)";
+      ctx.beginPath(); ctx.arc(secX, secY, 1.5, 0, 6.28); ctx.fill();
+      // trail behind seconds dot
+      for (let i = 1; i <= 8; i++) {
+        const trailSec = seconds - i * 0.12;
+        const trailY = slabY + (((trailSec % 60) + 60) % 60 / 60) * slabH;
+        const trailX = cx + Math.sin(trailSec * 0.5) * slabW * 0.15;
+        const ta = (1 - i / 9) * 0.3;
+        ctx.fillStyle = "rgba(200,210,240," + ta + ")";
+        ctx.beginPath(); ctx.arc(trailX, trailY, 1, 0, 6.28); ctx.fill();
+      }
+      // seconds glow
+      const sBloom = ctx.createRadialGradient(secX, secY, 0, secX, secY, 15);
+      sBloom.addColorStop(0, "rgba(200,220,255,0.15)");
+      sBloom.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = sBloom;
+      ctx.fillRect(secX - 15, secY - 15, 30, 30);
+
+      // subtle vertical veins of light within the slab
+      for (let i = 0; i < 5; i++) {
+        const vx = slabX + slabW * (0.15 + i * 0.18);
+        const pulse = Math.sin(t * 0.2 + i * 1.3) * 0.5 + 0.5;
+        const va = pulse * 0.015;
+        ctx.strokeStyle = "rgba(180,200,230," + va + ")";
+        ctx.lineWidth = 0.5;
+        ctx.beginPath();
+        ctx.moveTo(vx, slabY + 10);
+        ctx.lineTo(vx + Math.sin(t * 0.1 + i) * 2, slabY + slabH - 10);
+        ctx.stroke();
       }
 
-      // light caustic effect (sine wave overlay)
-      for (let i = 0; i < 3; i++) {
-        const angle = elapsed * (0.03 + i * 0.01) + i * 2.1;
-        const lx = cx + Math.cos(angle) * dialR * 0.3;
-        const ly = cy + Math.sin(angle) * dialR * 0.25;
-        const lr = dialR * (0.3 + Math.sin(elapsed * 0.2 + i) * 0.1);
-        const lg = ctx.createRadialGradient(lx, ly, 0, lx, ly, lr);
-        lg.addColorStop(0, "rgba(255,230,200,0.03)");
-        lg.addColorStop(1, "rgba(0,0,0,0)");
-        ctx.fillStyle = lg;
-        ctx.fillRect(lx - lr, ly - lr, lr * 2, lr * 2);
-      }
-
-      // glass reflection arc
+      // digital time at bottom — barely visible
+      const timeStr = d.getHours().toString().padStart(2, "0") + ":" +
+                     d.getMinutes().toString().padStart(2, "0");
       ctx.save();
-      ctx.globalAlpha = 0.04 + Math.sin(elapsed * 0.15) * 0.015;
-      ctx.translate(cx, cy);
-      ctx.rotate(-0.5 + elapsed * 0.01);
-      ctx.beginPath();
-      ctx.ellipse(0, -dialR * 0.35, dialR * 0.7, dialR * 0.08, 0, 0, Math.PI);
-      ctx.fillStyle = "#fff";
-      ctx.fill();
+      ctx.textAlign = "center";
+      ctx.textBaseline = "top";
+      ctx.font = "200 11px 'Iowan Old Style', Georgia, serif";
+      ctx.fillStyle = "rgba(150,160,180,0.25)";
+      ctx.fillText(timeStr, cx, slabY + slabH + 20);
       ctx.restore();
-
-      // tiny marker at 12
-      ctx.fillStyle = "rgba(200,190,170,0.5)";
-      ctx.fillRect(cx - 1, cy - dialR + 8, 2, 8);
-
-      // === HANDS ===
-      // hour hand
-      const hAngle = (hours / 12) * Math.PI * 2 - Math.PI / 2;
-      const hLen = dialR * 0.5;
-      const hGrad = ctx.createLinearGradient(cx, cy, cx + Math.cos(hAngle) * hLen, cy + Math.sin(hAngle) * hLen);
-      hGrad.addColorStop(0, "rgba(180,170,155,0.8)");
-      hGrad.addColorStop(1, "rgba(220,210,195,0.9)");
-      ctx.strokeStyle = hGrad;
-      ctx.lineWidth = 2;
-      ctx.lineCap = "round";
-      ctx.beginPath();
-      ctx.moveTo(cx, cy);
-      ctx.lineTo(cx + Math.cos(hAngle) * hLen, cy + Math.sin(hAngle) * hLen);
-      ctx.stroke();
-
-      // minute hand
-      const mAngle = (minutes / 60) * Math.PI * 2 - Math.PI / 2;
-      const mLen = dialR * 0.72;
-      const mGrad = ctx.createLinearGradient(cx, cy, cx + Math.cos(mAngle) * mLen, cy + Math.sin(mAngle) * mLen);
-      mGrad.addColorStop(0, "rgba(190,180,165,0.7)");
-      mGrad.addColorStop(1, "rgba(230,220,205,0.9)");
-      ctx.strokeStyle = mGrad;
-      ctx.lineWidth = 1.2;
-      ctx.beginPath();
-      ctx.moveTo(cx, cy);
-      ctx.lineTo(cx + Math.cos(mAngle) * mLen, cy + Math.sin(mAngle) * mLen);
-      ctx.stroke();
-
-      // center pin
-      ctx.fillStyle = "rgba(200,190,175,0.9)";
-      ctx.beginPath(); ctx.arc(cx, cy, 2.5, 0, Math.PI * 2); ctx.fill();
-
-      // seconds: orbiting luminous dot
-      const sAngle = (seconds / 60) * Math.PI * 2 - Math.PI / 2;
-      const sR = dialR * 0.85;
-      const sx = cx + Math.cos(sAngle) * sR;
-      const sy = cy + Math.sin(sAngle) * sR;
-      ctx.fillStyle = "rgba(255,220,170,0.9)";
-      ctx.beginPath(); ctx.arc(sx, sy, 2, 0, Math.PI * 2); ctx.fill();
-      const sg = ctx.createRadialGradient(sx, sy, 0, sx, sy, 10);
-      sg.addColorStop(0, "rgba(255,200,140,0.2)");
-      sg.addColorStop(1, "rgba(0,0,0,0)");
-      ctx.fillStyle = sg;
-      ctx.fillRect(sx - 10, sy - 10, 20, 20);
-
-      ctx.restore();
-
-      // crown (right side of case)
-      ctx.fillStyle = "#333";
-      ctx.fillRect(cx + dialR * 1.06, cy - 5, dialR * 0.06, 10);
-      const crGrad = ctx.createLinearGradient(cx + dialR * 1.06, cy - 5, cx + dialR * 1.12, cy + 5);
-      crGrad.addColorStop(0, "#444");
-      crGrad.addColorStop(0.5, "#555");
-      crGrad.addColorStop(1, "#333");
-      ctx.fillStyle = crGrad;
-      ctx.fillRect(cx + dialR * 1.06, cy - 4, dialR * 0.06, 8);
 
       widgetRAF = requestAnimationFrame(step);
     }
