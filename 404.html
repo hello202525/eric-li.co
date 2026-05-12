@@ -259,6 +259,10 @@
   body.play-mode .home { opacity: 0; transition: opacity 400ms ease; }
   body.play-mode #trail { opacity: 0; }
 
+  body.time-mode { background: #080808; transition: background 500ms ease; }
+  body.time-mode .home { opacity: 0; transition: opacity 400ms ease; }
+  body.time-mode #trail { opacity: 0; }
+
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
       animation-duration: 0.01ms !important;
@@ -536,7 +540,7 @@
 
   const ARTIST_KEYS = Object.keys(ARTIST_PRIMARY);
   const TYPEABLE = [...new Set([...ARTIST_KEYS, "gallery"])];
-  const WIDGETS = ["stars", "void", "mirror", "play"];
+  const WIDGETS = ["stars", "void", "mirror", "play", "time"];
   const YEARS = {
     "1820": "goya", "1867": "hugo", "1875": "whistler", "1891": "khnopff",
     "1892": "degouve", "1898": "atget-3", "1906": "schikaneder",
@@ -563,7 +567,7 @@
       if (currentPath() !== "") go("/");
       return;
     }
-    if (activeWidget === "stars" || activeWidget === "mirror" || activeWidget === "play") return;
+    if (activeWidget === "stars" || activeWidget === "mirror" || activeWidget === "play" || activeWidget === "time") return;
     if (k === "Backspace") {
       if (buf.length) {
         buf = buf.slice(0, -1);
@@ -716,7 +720,7 @@
     activeWidget = "";
     $widget.classList.remove("show");
     $widgetCanvas.classList.remove("show");
-    document.body.classList.remove("stars-mode", "void-mode", "mirror-mode", "play-mode");
+    document.body.classList.remove("stars-mode", "void-mode", "mirror-mode", "play-mode", "time-mode");
     if (playCleanup) { playCleanup(); playCleanup = null; }
       $widget.innerHTML = "";
     if (mirrorStream) {
@@ -755,6 +759,7 @@
     if (kind === "void") { runVoid(); return; }
     if (kind === "mirror") { runMirror(); return; }
     if (kind === "play") { runPlay(); return; }
+    if (kind === "time") { runTime(); return; }
   }
 
   function runStars() {
@@ -967,11 +972,339 @@
       });
   }
 
+  // === Watch Face ("time" command) ===
+  function runTime() {
+    const ctx = sizeWidgetCanvas();
+    const w = innerWidth, h = innerHeight;
+    document.body.classList.add("time-mode");
+    $widgetCanvas.classList.add("show");
+
+    const cx = w / 2, cy = h / 2;
+    const dialR = Math.min(w, h) * 0.35;
+    let startT = performance.now();
+
+    // precompute noise grid for fumé texture
+    const noiseGrid = [];
+    const NG = 64;
+    for (let i = 0; i < NG * NG; i++) noiseGrid[i] = Math.random();
+    function sampleNoise(x, y) {
+      const xi = ((x % NG) + NG) % NG, yi = ((y % NG) + NG) % NG;
+      const x0 = Math.floor(xi), y0 = Math.floor(yi);
+      const fx = xi - x0, fy = yi - y0;
+      const sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
+      const n00 = noiseGrid[(y0 % NG) * NG + (x0 % NG)];
+      const n10 = noiseGrid[(y0 % NG) * NG + ((x0 + 1) % NG)];
+      const n01 = noiseGrid[((y0 + 1) % NG) * NG + (x0 % NG)];
+      const n11 = noiseGrid[((y0 + 1) % NG) * NG + ((x0 + 1) % NG)];
+      return n00 * (1-sx) * (1-sy) + n10 * sx * (1-sy) + n01 * (1-sx) * sy + n11 * sx * sy;
+    }
+    function fbm(x, y, octaves) {
+      let v = 0, a = 0.5, f = 1;
+      for (let i = 0; i < octaves; i++) { v += a * sampleNoise(x * f, y * f); a *= 0.5; f *= 2.1; }
+      return v;
+    }
+
+    function step(now) {
+      if (activeWidget !== "time") return;
+      const elapsed = (now - startT) / 1000;
+      const d = new Date();
+      const hours = d.getHours() % 12 + d.getMinutes() / 60;
+      const minutes = d.getMinutes() + d.getSeconds() / 60;
+      const seconds = d.getSeconds() + d.getMilliseconds() / 1000;
+
+      ctx.clearRect(0, 0, w, h);
+
+      // dark background
+      ctx.fillStyle = "#080808";
+      ctx.fillRect(0, 0, w, h);
+
+      // === CASE (outer ring) ===
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(cx, cy, dialR * 1.08, 0, Math.PI * 2);
+      const caseGrad = ctx.createLinearGradient(cx - dialR, cy - dialR, cx + dialR, cy + dialR);
+      caseGrad.addColorStop(0, "#2a2a2a");
+      caseGrad.addColorStop(0.3, "#404040");
+      caseGrad.addColorStop(0.5, "#555");
+      caseGrad.addColorStop(0.7, "#3a3a3a");
+      caseGrad.addColorStop(1, "#222");
+      ctx.fillStyle = caseGrad;
+      ctx.fill();
+
+      // === DIAL: fumé gradient with animated noise displacement ===
+      ctx.beginPath();
+      ctx.arc(cx, cy, dialR, 0, Math.PI * 2);
+      ctx.clip();
+
+      // base fumé: sunburst radial gradient from copper-bronze center to midnight blue edges
+      const colorT = (Math.sin(elapsed * 0.08) + 1) * 0.5;
+      const innerR = Math.floor(40 + colorT * 30);
+      const innerG = Math.floor(30 + colorT * 15);
+      const innerB = Math.floor(25 + colorT * 10);
+      const outerR = Math.floor(8 + (1 - colorT) * 15);
+      const outerG = Math.floor(10 + (1 - colorT) * 12);
+      const outerB = Math.floor(30 + (1 - colorT) * 25);
+
+      const dialGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, dialR);
+      dialGrad.addColorStop(0, "rgb(" + innerR + "," + innerG + "," + innerB + ")");
+      dialGrad.addColorStop(0.3, "rgb(" + Math.floor(innerR*0.7+outerR*0.3) + "," + Math.floor(innerG*0.7+outerG*0.3) + "," + Math.floor(innerB*0.7+outerB*0.3) + ")");
+      dialGrad.addColorStop(0.7, "rgb(" + Math.floor(innerR*0.3+outerR*0.7) + "," + Math.floor(innerG*0.3+outerG*0.7) + "," + Math.floor(innerB*0.3+outerB*0.7) + ")");
+      dialGrad.addColorStop(1, "rgb(" + outerR + "," + outerG + "," + outerB + ")");
+      ctx.fillStyle = dialGrad;
+      ctx.fillRect(cx - dialR, cy - dialR, dialR * 2, dialR * 2);
+
+      // fumé smoke texture (layered noise displacement)
+      const smokeRes = 80;
+      const cellW = (dialR * 2) / smokeRes;
+      for (let yi = 0; yi < smokeRes; yi++) {
+        for (let xi = 0; xi < smokeRes; xi++) {
+          const px = cx - dialR + xi * cellW;
+          const py = cy - dialR + yi * cellW;
+          const dx = px - cx, dy = py - cy;
+          if (dx * dx + dy * dy > dialR * dialR) continue;
+          const n = fbm(xi * 0.15 + elapsed * 0.02, yi * 0.15 + elapsed * 0.015, 4);
+          const sunburstAng = Math.atan2(dy, dx);
+          const sunburst = (Math.sin(sunburstAng * 12 + n * 8) + 1) * 0.5;
+          const distFromCenter = Math.sqrt(dx * dx + dy * dy) / dialR;
+          const smokeA = (n * 0.3 + sunburst * 0.15) * (0.3 + distFromCenter * 0.5);
+          if (smokeA < 0.02) continue;
+          ctx.fillStyle = "rgba(0,0,0," + Math.min(0.4, smokeA) + ")";
+          ctx.fillRect(px, py, cellW + 0.5, cellW + 0.5);
+        }
+      }
+
+      // light caustic effect (sine wave overlay)
+      for (let i = 0; i < 3; i++) {
+        const angle = elapsed * (0.03 + i * 0.01) + i * 2.1;
+        const lx = cx + Math.cos(angle) * dialR * 0.3;
+        const ly = cy + Math.sin(angle) * dialR * 0.25;
+        const lr = dialR * (0.3 + Math.sin(elapsed * 0.2 + i) * 0.1);
+        const lg = ctx.createRadialGradient(lx, ly, 0, lx, ly, lr);
+        lg.addColorStop(0, "rgba(255,230,200,0.03)");
+        lg.addColorStop(1, "rgba(0,0,0,0)");
+        ctx.fillStyle = lg;
+        ctx.fillRect(lx - lr, ly - lr, lr * 2, lr * 2);
+      }
+
+      // glass reflection arc
+      ctx.save();
+      ctx.globalAlpha = 0.04 + Math.sin(elapsed * 0.15) * 0.015;
+      ctx.translate(cx, cy);
+      ctx.rotate(-0.5 + elapsed * 0.01);
+      ctx.beginPath();
+      ctx.ellipse(0, -dialR * 0.35, dialR * 0.7, dialR * 0.08, 0, 0, Math.PI);
+      ctx.fillStyle = "#fff";
+      ctx.fill();
+      ctx.restore();
+
+      // tiny marker at 12
+      ctx.fillStyle = "rgba(200,190,170,0.5)";
+      ctx.fillRect(cx - 1, cy - dialR + 8, 2, 8);
+
+      // === HANDS ===
+      // hour hand
+      const hAngle = (hours / 12) * Math.PI * 2 - Math.PI / 2;
+      const hLen = dialR * 0.5;
+      const hGrad = ctx.createLinearGradient(cx, cy, cx + Math.cos(hAngle) * hLen, cy + Math.sin(hAngle) * hLen);
+      hGrad.addColorStop(0, "rgba(180,170,155,0.8)");
+      hGrad.addColorStop(1, "rgba(220,210,195,0.9)");
+      ctx.strokeStyle = hGrad;
+      ctx.lineWidth = 2;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + Math.cos(hAngle) * hLen, cy + Math.sin(hAngle) * hLen);
+      ctx.stroke();
+
+      // minute hand
+      const mAngle = (minutes / 60) * Math.PI * 2 - Math.PI / 2;
+      const mLen = dialR * 0.72;
+      const mGrad = ctx.createLinearGradient(cx, cy, cx + Math.cos(mAngle) * mLen, cy + Math.sin(mAngle) * mLen);
+      mGrad.addColorStop(0, "rgba(190,180,165,0.7)");
+      mGrad.addColorStop(1, "rgba(230,220,205,0.9)");
+      ctx.strokeStyle = mGrad;
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + Math.cos(mAngle) * mLen, cy + Math.sin(mAngle) * mLen);
+      ctx.stroke();
+
+      // center pin
+      ctx.fillStyle = "rgba(200,190,175,0.9)";
+      ctx.beginPath(); ctx.arc(cx, cy, 2.5, 0, Math.PI * 2); ctx.fill();
+
+      // seconds: orbiting luminous dot
+      const sAngle = (seconds / 60) * Math.PI * 2 - Math.PI / 2;
+      const sR = dialR * 0.85;
+      const sx = cx + Math.cos(sAngle) * sR;
+      const sy = cy + Math.sin(sAngle) * sR;
+      ctx.fillStyle = "rgba(255,220,170,0.9)";
+      ctx.beginPath(); ctx.arc(sx, sy, 2, 0, Math.PI * 2); ctx.fill();
+      const sg = ctx.createRadialGradient(sx, sy, 0, sx, sy, 10);
+      sg.addColorStop(0, "rgba(255,200,140,0.2)");
+      sg.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = sg;
+      ctx.fillRect(sx - 10, sy - 10, 20, 20);
+
+      ctx.restore();
+
+      // crown (right side of case)
+      ctx.fillStyle = "#333";
+      ctx.fillRect(cx + dialR * 1.06, cy - 5, dialR * 0.06, 10);
+      const crGrad = ctx.createLinearGradient(cx + dialR * 1.06, cy - 5, cx + dialR * 1.12, cy + 5);
+      crGrad.addColorStop(0, "#444");
+      crGrad.addColorStop(0.5, "#555");
+      crGrad.addColorStop(1, "#333");
+      ctx.fillStyle = crGrad;
+      ctx.fillRect(cx + dialR * 1.06, cy - 4, dialR * 0.06, 8);
+
+      widgetRAF = requestAnimationFrame(step);
+    }
+    widgetRAF = requestAnimationFrame(step);
+  }
+
+  // === PlayAudio: procedural Web Audio synthesis for play sequence ===
+  class PlayAudio {
+    constructor() {
+      this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = 0.35;
+      this.master.connect(this.ctx.destination);
+      this.nodes = [];
+    }
+    _osc(type, freq, gain, detune) {
+      const o = this.ctx.createOscillator();
+      const g = this.ctx.createGain();
+      o.type = type; o.frequency.value = freq;
+      if (detune) o.detune.value = detune;
+      g.gain.value = gain;
+      o.connect(g); g.connect(this.master); o.start();
+      this.nodes.push({ osc: o, gain: g });
+      return { osc: o, gain: g };
+    }
+    _noise(gain) {
+      const bufSize = this.ctx.sampleRate * 2;
+      const buf = this.ctx.createBuffer(1, bufSize, this.ctx.sampleRate);
+      const data = buf.getChannelData(0);
+      for (let i = 0; i < bufSize; i++) data[i] = Math.random() * 2 - 1;
+      const src = this.ctx.createBufferSource();
+      src.buffer = buf; src.loop = true;
+      const g = this.ctx.createGain(); g.gain.value = gain;
+      const f = this.ctx.createBiquadFilter();
+      f.type = "lowpass"; f.frequency.value = 200;
+      src.connect(f); f.connect(g); g.connect(this.master); src.start();
+      this.nodes.push({ osc: src, gain: g, filter: f });
+      return { src, gain: g, filter: f };
+    }
+    stopAll() {
+      for (const n of this.nodes) {
+        try { n.gain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.3); } catch(e){}
+        try { setTimeout(() => n.osc.stop(), 600); } catch(e){}
+      }
+      this.nodes = [];
+    }
+    launch() {
+      this.stopAll();
+      this._drone = this._osc("sine", 45, 0.15);
+      this._drone2 = this._osc("sine", 90, 0.06, 3);
+      this._rumble = this._noise(0.0);
+      this._rumble.filter.frequency.value = 120;
+    }
+    launchTick(phaseT, ignitionT) {
+      if (!this._drone) return;
+      const pre = Math.max(0, Math.min(1, (phaseT - 1.0) / (ignitionT - 1.0)));
+      this._rumble.gain.gain.setTargetAtTime(pre * 0.08, this.ctx.currentTime, 0.05);
+      this._rumble.filter.frequency.setTargetAtTime(120 + pre * 400, this.ctx.currentTime, 0.05);
+      if (phaseT > ignitionT) {
+        const post = Math.min(1, (phaseT - ignitionT) / 2);
+        this._drone.osc.frequency.setTargetAtTime(45 + post * 30, this.ctx.currentTime, 0.1);
+        this._drone.gain.gain.setTargetAtTime(0.15 + post * 0.15, this.ctx.currentTime, 0.05);
+        this._rumble.gain.gain.setTargetAtTime(0.08 + post * 0.12, this.ctx.currentTime, 0.05);
+        this._rumble.filter.frequency.setTargetAtTime(520 + post * 800, this.ctx.currentTime, 0.1);
+      }
+    }
+    warp() {
+      this.stopAll();
+      this._wDrone = this._osc("sawtooth", 55, 0.0);
+      this._wDrone2 = this._osc("sine", 82, 0.04, -7);
+      this._wDrone3 = this._osc("sine", 110, 0.03, 5);
+      this._wNoise = this._noise(0.0);
+      this._wNoise.filter.type = "bandpass";
+      this._wNoise.filter.frequency.value = 400;
+      this._wNoise.filter.Q.value = 2;
+    }
+    warpTick(p) {
+      if (!this._wDrone) return;
+      const intensity = Math.min(1, p * 2);
+      this._wDrone.gain.gain.setTargetAtTime(intensity * 0.06, this.ctx.currentTime, 0.1);
+      this._wDrone.osc.frequency.setTargetAtTime(55 + p * 40, this.ctx.currentTime, 0.2);
+      this._wNoise.gain.gain.setTargetAtTime(intensity * 0.08, this.ctx.currentTime, 0.1);
+      this._wNoise.filter.frequency.setTargetAtTime(400 + p * 2000, this.ctx.currentTime, 0.2);
+      if (p > 0.75) {
+        const fade = 1 - (p - 0.75) / 0.25;
+        this._wDrone.gain.gain.setTargetAtTime(fade * 0.06, this.ctx.currentTime, 0.1);
+        this._wNoise.gain.gain.setTargetAtTime(fade * 0.08, this.ctx.currentTime, 0.1);
+      }
+    }
+    crash() {
+      this.stopAll();
+      const boom = this._noise(0.25);
+      boom.filter.frequency.value = 800;
+      boom.gain.gain.setTargetAtTime(0, this.ctx.currentTime + 0.15, 0.12);
+      const sub = this._osc("sine", 30, 0.3);
+      sub.gain.gain.setTargetAtTime(0.05, this.ctx.currentTime + 0.3, 0.2);
+      this._crashHum = this._osc("sawtooth", 38, 0.0);
+      const hf = this.ctx.createBiquadFilter();
+      hf.type = "lowpass"; hf.frequency.value = 100;
+      this._crashHum.osc.disconnect();
+      this._crashHum.osc.connect(hf); hf.connect(this._crashHum.gain);
+      setTimeout(() => {
+        if (this._crashHum) this._crashHum.gain.gain.setTargetAtTime(0.04, this.ctx.currentTime, 0.5);
+      }, 500);
+    }
+    drift() {
+      this.stopAll();
+      this._pad1 = this._osc("sine", 220, 0.0, 3);
+      this._pad2 = this._osc("sine", 330, 0.0, -5);
+      this._pad3 = this._osc("sine", 165, 0.0, 2);
+      this._driftT = 0;
+    }
+    driftTick(dt) {
+      if (!this._pad1) return;
+      this._driftT += dt;
+      const vol = Math.min(0.025, this._driftT * 0.005);
+      const lfo = 0.7 + 0.3 * Math.sin(this._driftT * 0.3);
+      this._pad1.gain.gain.setTargetAtTime(vol * lfo, this.ctx.currentTime, 0.1);
+      this._pad2.gain.gain.setTargetAtTime(vol * 0.7 * lfo, this.ctx.currentTime, 0.1);
+      this._pad3.gain.gain.setTargetAtTime(vol * 0.5 * lfo, this.ctx.currentTime, 0.1);
+    }
+    chime() {
+      const t = this.ctx.currentTime;
+      [523, 659, 784].forEach((f, i) => {
+        const o = this.ctx.createOscillator();
+        const g = this.ctx.createGain();
+        o.type = "sine"; o.frequency.value = f;
+        g.gain.setValueAtTime(0, t + i * 0.12);
+        g.gain.linearRampToValueAtTime(0.06, t + i * 0.12 + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.001, t + i * 0.12 + 1.5);
+        o.connect(g); g.connect(this.master); o.start(t + i * 0.12);
+        o.stop(t + i * 0.12 + 2);
+      });
+    }
+    destroy() {
+      this.stopAll();
+      try { this.ctx.close(); } catch(e){}
+    }
+  }
+
   function runPlay() {
     const ctx = sizeWidgetCanvas();
     const W = innerWidth, H = innerHeight;
     document.body.classList.add("play-mode");
     $widgetCanvas.classList.add("show");
+
+    const audio = new PlayAudio();
+    audio.launch();
 
     let phase = "launch";
     let phaseT = 0;
@@ -989,6 +1322,7 @@
       removeEventListener("keydown", kd, { capture: true });
       removeEventListener("keyup", ku);
       if (crashGL) { crashGL.destroy(); crashGL = null; }
+      audio.destroy();
     };
 
     let fadeAlpha = 0;
@@ -997,7 +1331,13 @@
 
     function fadeTo(p) {
       fadeTarget = 1;
-      fadeCallback = () => { phase = p; phaseT = 0; fadeTarget = 0; };
+      fadeCallback = () => {
+        phase = p; phaseT = 0; fadeTarget = 0;
+        if (p === "warp") audio.warp();
+        else if (p === "crash") audio.crash();
+        else if (p === "game") audio.drift();
+        else if (p === "ending") audio.chime();
+      };
     }
     function setPhase(p) { phase = p; phaseT = 0; }
 
@@ -1058,51 +1398,48 @@
     // ===== LAUNCH STATE =====
     let rY = H * 0.65, rVel = 0, rRot = 0;
     const exhaust = [];
+    // depth: 0 = far (slow), 1 = mid, 2 = near (fast)
     const bgStars = [];
-    // layer 1: dense base field (6000 tiny stars everywhere)
-    for (let i = 0; i < 6000; i++) bgStars.push({
-      x: Math.random() * W, y: Math.random() * H,
-      r: 0.1 + Math.random() * 0.3,
-      b: 0.05 + Math.random() * 0.35,
-      tw: Math.random() * 6.28, twSpd: 0.1 + Math.random() * 1.5,
-    });
-    // layer 2: milky way band (diagonal dense streak)
+    function pushStar(x, y, r, b, tw, twSpd, depth) {
+      bgStars.push({ x, y, r, b, tw, twSpd, depth: depth || 0 });
+    }
+    // layer 1: dense base field — far
+    for (let i = 0; i < 6000; i++) pushStar(
+      Math.random() * W, Math.random() * H,
+      0.1 + Math.random() * 0.25, 0.05 + Math.random() * 0.3,
+      Math.random() * 6.28, 0.1 + Math.random() * 1.5, 0
+    );
+    // layer 2: milky way band — mid
     for (let i = 0; i < 3000; i++) {
       const t = Math.random();
-      const bandX = t * W;
-      const bandY = (t * 0.6 + 0.2) * H + (Math.random() - 0.5) * H * 0.15;
-      bgStars.push({
-        x: bandX + (Math.random() - 0.5) * W * 0.08,
-        y: bandY,
-        r: 0.1 + Math.random() * 0.5,
-        b: 0.1 + Math.random() * 0.5,
-        tw: Math.random() * 6.28, twSpd: 0.2 + Math.random() * 1.2,
-      });
+      pushStar(
+        t * W + (Math.random() - 0.5) * W * 0.08,
+        (t * 0.6 + 0.2) * H + (Math.random() - 0.5) * H * 0.15,
+        0.1 + Math.random() * 0.5, 0.1 + Math.random() * 0.5,
+        Math.random() * 6.28, 0.2 + Math.random() * 1.2, 1
+      );
     }
-    // layer 3: star clusters (8 clusters of 200 stars each)
+    // layer 3: star clusters — near
     for (let c = 0; c < 8; c++) {
       const cx0 = Math.random() * W, cy0 = Math.random() * H;
       const cR = 30 + Math.random() * 80;
       for (let i = 0; i < 200; i++) {
         const ang = Math.random() * 6.28;
         const dist = Math.pow(Math.random(), 0.5) * cR;
-        bgStars.push({
-          x: cx0 + Math.cos(ang) * dist,
-          y: cy0 + Math.sin(ang) * dist,
-          r: 0.15 + Math.random() * 0.6,
-          b: 0.15 + Math.random() * 0.6,
-          tw: Math.random() * 6.28, twSpd: 0.3 + Math.random() * 1.8,
-        });
+        pushStar(
+          cx0 + Math.cos(ang) * dist, cy0 + Math.sin(ang) * dist,
+          0.15 + Math.random() * 0.6, 0.15 + Math.random() * 0.6,
+          Math.random() * 6.28, 0.3 + Math.random() * 1.8, 2
+        );
       }
     }
-    // layer 4: bright feature stars (200 larger, brighter)
-    for (let i = 0; i < 200; i++) bgStars.push({
-      x: Math.random() * W, y: Math.random() * H,
-      r: 0.5 + Math.random() * 1.5,
-      b: 0.5 + Math.random() * 0.5,
-      tw: Math.random() * 6.28, twSpd: 0.05 + Math.random() * 0.8,
-    });
-    // layer 5: geometric constellations (line patterns)
+    // layer 4: bright feature stars — near
+    for (let i = 0; i < 200; i++) pushStar(
+      Math.random() * W, Math.random() * H,
+      0.5 + Math.random() * 1.5, 0.5 + Math.random() * 0.5,
+      Math.random() * 6.28, 0.05 + Math.random() * 0.8, 2
+    );
+    // layer 5: geometric constellations — mid
     const constellations = [
       [[0.1,0.2],[0.15,0.15],[0.22,0.18],[0.28,0.12],[0.33,0.16]],
       [[0.6,0.7],[0.65,0.75],[0.7,0.72],[0.75,0.78],[0.72,0.83],[0.68,0.8]],
@@ -1115,15 +1452,15 @@
     ];
     for (const pts of constellations) {
       for (const [px, py] of pts) {
-        bgStars.push({
-          x: px * W + (Math.random() - 0.5) * 4,
-          y: py * H + (Math.random() - 0.5) * 4,
-          r: 0.8 + Math.random() * 1.0,
-          b: 0.6 + Math.random() * 0.35,
-          tw: Math.random() * 6.28, twSpd: 0.05 + Math.random() * 0.4,
-        });
+        pushStar(
+          px * W + (Math.random() - 0.5) * 4, py * H + (Math.random() - 0.5) * 4,
+          0.8 + Math.random() * 1.0, 0.6 + Math.random() * 0.35,
+          Math.random() * 6.28, 0.05 + Math.random() * 0.4, 1
+        );
       }
     }
+    const depthRotMult = [0.3, 1.0, 2.5];
+    const depthScaleMult = [0.97, 1.0, 1.04];
 
     // ===== WARP STATE =====
     const wStars = [];
@@ -1178,17 +1515,37 @@
     let driftZ = 0;
     let ended = false;
 
+    // collectible light orbs
+    const orbs = [];
+    for (let i = 0; i < 10; i++) orbs.push({
+      x: (Math.random() - 0.5) * 3, y: (Math.random() - 0.5) * 2.5,
+      z: 3 + Math.random() * 25, collected: false, pulse: Math.random() * 6.28,
+      hue: Math.floor(Math.random() * 3),
+    });
+    const orbBursts = [];
+
     // ======== LAUNCH ========
+    const ignitionT = 2.0;
+    const liftT = 2.4;
+
     function drawLaunch(dt) {
       ctx.fillStyle = "#020204";
       ctx.fillRect(0, 0, W, H);
 
-      // star field: gentle rotation + twinkle + color + glow + constellation lines
-      const fieldRot = phaseT < 1.5 ? phaseT * 0.002 : 0.003 + (phaseT - 1.5) * 0.008;
-      const cosR = Math.cos(phaseT * fieldRot), sinR = Math.sin(phaseT * fieldRot);
+      // star field: 3-depth parallax rotation + twinkle + color + glow
+      const baseRot = phaseT < 1.5 ? phaseT * 0.002 : 0.003 + (phaseT - 1.5) * 0.008;
       const scx = W / 2, scy = H / 2;
+      const accelScale = phaseT > liftT ? 1 + Math.min(3, (phaseT - liftT) * 0.3) : 1;
 
-      // draw constellation lines first (behind stars)
+      // precompute cos/sin for each depth layer
+      const layerCos = [], layerSin = [], layerScale = [];
+      for (let d = 0; d < 3; d++) {
+        const r = phaseT * baseRot * depthRotMult[d];
+        layerCos[d] = Math.cos(r); layerSin[d] = Math.sin(r);
+        layerScale[d] = 1 + (depthScaleMult[d] - 1) * (accelScale - 1);
+      }
+
+      // constellation lines (depth=1, mid layer)
       ctx.save();
       ctx.strokeStyle = "rgba(120,140,180,0.08)";
       ctx.lineWidth = 0.5;
@@ -1196,9 +1553,9 @@
         ctx.beginPath();
         for (let ci = 0; ci < pts.length; ci++) {
           const rx = pts[ci][0] * W, ry = pts[ci][1] * H;
-          const dx = rx - scx, dy = ry - scy;
-          const sx = scx + dx * cosR - dy * sinR;
-          const sy = scy + dx * sinR + dy * cosR;
+          const dx = (rx - scx) * layerScale[1], dy = (ry - scy) * layerScale[1];
+          const sx = scx + dx * layerCos[1] - dy * layerSin[1];
+          const sy = scy + dx * layerSin[1] + dy * layerCos[1];
           ci === 0 ? ctx.moveTo(sx, sy) : ctx.lineTo(sx, sy);
         }
         ctx.stroke();
@@ -1206,25 +1563,24 @@
       ctx.restore();
 
       for (const s of bgStars) {
-        const dx = s.x - scx, dy = s.y - scy;
-        const sx = scx + dx * cosR - dy * sinR;
-        const sy = scy + dx * sinR + dy * cosR;
+        const d = s.depth;
+        const sc = layerScale[d];
+        const dx = (s.x - scx) * sc, dy = (s.y - scy) * sc;
+        const sx = scx + dx * layerCos[d] - dy * layerSin[d];
+        const sy = scy + dx * layerSin[d] + dy * layerCos[d];
         const twinkle = 0.4 + 0.6 * (0.5 + 0.5 * Math.sin(s.tw + phaseT * s.twSpd));
         const bright = s.b * twinkle;
         if (bright < 0.03) continue;
-        // warm/cool color tint based on twinkle phase
         const hue = s.tw < 2 ? "200,220,255" : s.tw < 4 ? "255,240,220" : "225,223,218";
         ctx.fillStyle = "rgba(" + hue + "," + bright + ")";
         ctx.beginPath(); ctx.arc(sx, sy, s.r, 0, Math.PI * 2); ctx.fill();
-        // glow halo for brighter/larger stars
         if (s.r > 0.6 && bright > 0.3) {
           ctx.fillStyle = "rgba(" + hue + "," + (bright * 0.15) + ")";
           ctx.beginPath(); ctx.arc(sx, sy, s.r * 3, 0, Math.PI * 2); ctx.fill();
         }
       }
 
-      const ignitionT = 2.0;
-      const liftT = 2.4;
+      audio.launchTick(phaseT, ignitionT);
 
       // pre-ignition rumble
       let shX = 0, shY = 0;
@@ -1326,6 +1682,7 @@
     function drawWarp(dt) {
       const dur = 7;
       const p = Math.min(1, phaseT / dur);
+      audio.warpTick(p);
       const cx = W / 2, cy = H / 2;
       const diag = Math.hypot(W, H);
 
@@ -1458,17 +1815,55 @@
       ctx.fillStyle = vig;
       ctx.fillRect(0, 0, W, H);
 
-      // === MARS APPROACH ===
-      if (p > 0.8) {
-        const mp = (p - 0.8) / 0.2;
+      // === MARS APPROACH (dot → sphere → entry streaks) ===
+      if (p > 0.65) {
+        const mp = Math.min(1, (p - 0.65) / 0.35);
         const mr = mp * mp * Math.min(W, H) * 0.9;
-        const mGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(1, mr));
-        mGrad.addColorStop(0, "rgba(180,70,32," + (mp * 0.95) + ")");
-        mGrad.addColorStop(0.3, "rgba(140,50,22," + (mp * 0.7) + ")");
-        mGrad.addColorStop(0.6, "rgba(90,35,15," + (mp * 0.4) + ")");
-        mGrad.addColorStop(1, "rgba(40,15,8,0)");
-        ctx.fillStyle = mGrad;
-        ctx.beginPath(); ctx.arc(cx, cy, mr, 0, Math.PI * 2); ctx.fill();
+
+        // atmospheric haze (appears first as a faint glow)
+        if (mp < 0.4) {
+          const hazeA = mp / 0.4 * 0.3;
+          const hazeR = 3 + mp * 40;
+          const hazeG = ctx.createRadialGradient(cx, cy, 0, cx, cy, hazeR);
+          hazeG.addColorStop(0, "rgba(200,100,50," + hazeA + ")");
+          hazeG.addColorStop(1, "rgba(100,40,15,0)");
+          ctx.fillStyle = hazeG;
+          ctx.beginPath(); ctx.arc(cx, cy, hazeR, 0, Math.PI * 2); ctx.fill();
+        }
+
+        // planet body
+        if (mr > 2) {
+          const mGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(1, mr));
+          mGrad.addColorStop(0, "rgba(180,70,32," + (mp * 0.95) + ")");
+          mGrad.addColorStop(0.3, "rgba(140,50,22," + (mp * 0.7) + ")");
+          mGrad.addColorStop(0.6, "rgba(90,35,15," + (mp * 0.4) + ")");
+          mGrad.addColorStop(1, "rgba(40,15,8,0)");
+          ctx.fillStyle = mGrad;
+          ctx.beginPath(); ctx.arc(cx, cy, mr, 0, Math.PI * 2); ctx.fill();
+        }
+
+        // atmospheric entry streaks (last 15% of warp)
+        if (p > 0.85) {
+          const entryP = (p - 0.85) / 0.15;
+          const streakCount = Math.floor(entryP * 30);
+          for (let i = 0; i < streakCount; i++) {
+            const sa = hash(i * 73 + 5) * Math.PI * 2;
+            const sr = hash(i * 137 + 11) * diag * 0.4 + diag * 0.15;
+            const sl = 20 + hash(i * 41 + 17) * 80;
+            const sx = cx + Math.cos(sa) * sr;
+            const sy = cy + Math.sin(sa) * sr;
+            const ex = sx + Math.cos(sa + Math.PI) * sl * entryP;
+            const ey = sy + Math.sin(sa + Math.PI) * sl * entryP;
+            const sAlpha = entryP * (0.3 + hash(i * 97 + 23) * 0.5);
+            const sGrad = ctx.createLinearGradient(sx, sy, ex, ey);
+            sGrad.addColorStop(0, "rgba(255,160,60," + sAlpha + ")");
+            sGrad.addColorStop(0.5, "rgba(255,100,30," + (sAlpha * 0.6) + ")");
+            sGrad.addColorStop(1, "rgba(255,60,10,0)");
+            ctx.strokeStyle = sGrad;
+            ctx.lineWidth = 1 + hash(i * 59 + 31) * 2;
+            ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.stroke();
+          }
+        }
       }
 
       if (phaseT >= dur && !fadeCallback) fadeTo("crash");
@@ -1961,6 +2356,7 @@ void main(){
     // ======== DRIFT (3rd person astronaut) ========
     function drawGame(dt) {
       if (ended) return;
+      audio.driftTick(dt);
 
       const baseSpd = 1.0;
       driftZ += dt * baseSpd;
@@ -2091,6 +2487,58 @@ void main(){
         ctx.beginPath(); ctx.arc(sx, sy, r, 0, 6.28); ctx.fill();
       }
 
+      // === LIGHT ORBS (collectibles) ===
+      const orbFOV = 200;
+      const orbColors = ["120,180,255", "180,255,200", "255,200,120"];
+      for (const orb of orbs) {
+        const relZ = orb.z - (driftZ * 0.7 % 30);
+        const wz = relZ < 0.5 ? relZ + 30 : relZ;
+        if (wz > 16 || orb.collected) continue;
+        const sc = orbFOV / wz;
+        const ox = cx + (orb.x + parX * 0.6) * sc;
+        const oy = cy + (orb.y + parY * 0.6) * sc;
+        if (ox < -40 || ox > W + 40 || oy < -40 || oy > H + 40) continue;
+        const orbR = 4 * sc * 0.04;
+        if (orbR < 1) continue;
+        orb.pulse += dt * 2;
+        const pa = 0.5 + 0.5 * Math.sin(orb.pulse);
+        const col = orbColors[orb.hue];
+        // outer glow
+        const grd = ctx.createRadialGradient(ox, oy, 0, ox, oy, orbR * 6);
+        grd.addColorStop(0, "rgba(" + col + "," + (0.25 * pa) + ")");
+        grd.addColorStop(0.4, "rgba(" + col + "," + (0.08 * pa) + ")");
+        grd.addColorStop(1, "rgba(0,0,0,0)");
+        ctx.fillStyle = grd;
+        ctx.fillRect(ox - orbR * 6, oy - orbR * 6, orbR * 12, orbR * 12);
+        // core
+        ctx.fillStyle = "rgba(255,255,255," + (0.7 + pa * 0.3) + ")";
+        ctx.beginPath(); ctx.arc(ox, oy, orbR, 0, 6.28); ctx.fill();
+        // collision with astronaut
+        const ax2 = cx + P.x, ay2 = cy + H * 0.18 + P.y;
+        if (wz < 3 && Math.hypot(ox - ax2, oy - ay2) < orbR * 4 + 15) {
+          orb.collected = true;
+          for (let j = 0; j < 25; j++) {
+            const ba = Math.random() * 6.28;
+            const bspd = 40 + Math.random() * 80;
+            orbBursts.push({
+              x: ox, y: oy, vx: Math.cos(ba) * bspd, vy: Math.sin(ba) * bspd,
+              life: 0.6 + Math.random() * 0.5, col: col,
+            });
+          }
+          audio.chime();
+          // respawn far away
+          setTimeout(() => { orb.collected = false; orb.z = driftZ * 0.7 + 12 + Math.random() * 15; }, 2000);
+        }
+      }
+      // orb burst particles
+      for (let i = orbBursts.length - 1; i >= 0; i--) {
+        const bp = orbBursts[i];
+        bp.x += bp.vx * dt; bp.y += bp.vy * dt; bp.life -= dt * 1.5;
+        if (bp.life <= 0) { orbBursts.splice(i, 1); continue; }
+        ctx.fillStyle = "rgba(" + bp.col + "," + (bp.life * 0.8) + ")";
+        ctx.beginPath(); ctx.arc(bp.x, bp.y, 1.5 * bp.life, 0, 6.28); ctx.fill();
+      }
+
       // === MARS GLOW (fading below) ===
       if (progress < 0.25) {
         const marsA = (1 - progress / 0.25) * 0.6;
@@ -2183,22 +2631,72 @@ void main(){
     }
 
     let endingT = 0;
+    const endDust = [];
+    for (let i = 0; i < 8; i++) endDust.push({
+      x: Math.random() * W, y: Math.random() * H,
+      vx: (Math.random() - 0.5) * 6, vy: (Math.random() - 0.5) * 4,
+    });
+    const welcomeText = "Welcome home.";
+    let welcomeRevealed = 0;
+    let lastRevealT = 0;
+
     function drawEnding(dt) {
       endingT += dt;
       ctx.fillStyle = "#fff";
       ctx.fillRect(0, 0, W, H);
-      const textFade = endingT < 0.5 ? endingT / 0.5 : endingT < 2.5 ? 1 : Math.max(0, 1 - (endingT - 2.5) / 0.8);
-      if (textFade > 0.01) {
+
+      // floating dust motes
+      for (const d of endDust) {
+        d.x += d.vx * dt; d.y += d.vy * dt;
+        d.vx += (Math.random() - 0.5) * 2 * dt;
+        d.vy += (Math.random() - 0.5) * 2 * dt;
+        d.vx *= 0.99; d.vy *= 0.99;
+        if (d.x < 0) d.x = W; if (d.x > W) d.x = 0;
+        if (d.y < 0) d.y = H; if (d.y > H) d.y = 0;
+        const dustA = endingT < 0.3 ? endingT / 0.3 : endingT > 3.5 ? Math.max(0, 1 - (endingT - 3.5) / 0.6) : 1;
+        ctx.fillStyle = "rgba(200,190,170," + (0.12 * dustA) + ")";
+        ctx.beginPath(); ctx.arc(d.x, d.y, 1.2, 0, Math.PI * 2); ctx.fill();
+        const dg = ctx.createRadialGradient(d.x, d.y, 0, d.x, d.y, 8);
+        dg.addColorStop(0, "rgba(200,190,170," + (0.04 * dustA) + ")");
+        dg.addColorStop(1, "rgba(0,0,0,0)");
+        ctx.fillStyle = dg;
+        ctx.fillRect(d.x - 8, d.y - 8, 16, 16);
+      }
+
+      // typewriter text reveal (starts at 0.4s)
+      if (endingT > 0.4 && welcomeRevealed < welcomeText.length) {
+        if (endingT - lastRevealT > 0.08) {
+          welcomeRevealed++;
+          lastRevealT = endingT;
+        }
+      }
+
+      const textFade = endingT < 0.4 ? 0 : endingT < 3.2 ? Math.min(1, (endingT - 0.4) / 0.3) : Math.max(0, 1 - (endingT - 3.2) / 0.7);
+      if (welcomeRevealed > 0 && textFade > 0.01) {
         ctx.save();
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.font = "300 clamp(16px, 2.2vw, 22px) 'EB Garamond', serif";
         ctx.font = "300 22px 'EB Garamond', serif";
         ctx.fillStyle = "rgba(40,36,30," + textFade + ")";
-        ctx.fillText("Welcome home.", W / 2, H / 2);
+        ctx.fillText(welcomeText.slice(0, welcomeRevealed), W / 2, H / 2);
         ctx.restore();
       }
-      if (endingT > 3.3) clearWidget();
+
+      // warm gradient pulse after text is fully typed
+      if (welcomeRevealed >= welcomeText.length && endingT < 3.5) {
+        const pulseT = Math.max(0, endingT - (0.4 + welcomeText.length * 0.08));
+        if (pulseT > 0) {
+          const pulseA = Math.sin(Math.min(Math.PI, pulseT * 1.5)) * 0.04;
+          const pulseR = pulseT * 200;
+          const pg = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, Math.max(1, pulseR));
+          pg.addColorStop(0, "rgba(247,244,236," + pulseA + ")");
+          pg.addColorStop(1, "rgba(240,230,210,0)");
+          ctx.fillStyle = pg;
+          ctx.fillRect(0, 0, W, H);
+        }
+      }
+
+      if (endingT > 4.0) clearWidget();
     }
 
     function frame(now) {
@@ -2283,6 +2781,47 @@ void main(){
 
   render(currentPath());
   resetIdle();
+
+  // bio letter-stagger on first visit per session
+  if (!sessionStorage.getItem("bio-revealed")) {
+    sessionStorage.setItem("bio-revealed", "1");
+    const bioEl = document.querySelector(".bio");
+    if (bioEl && !$home.hidden) {
+      const original = bioEl.innerHTML;
+      const walker = document.createTreeWalker(bioEl, NodeFilter.SHOW_TEXT, null, false);
+      const textNodes = [];
+      let node;
+      while (node = walker.nextNode()) textNodes.push(node);
+
+      const spans = [];
+      for (const tn of textNodes) {
+        const frag = document.createDocumentFragment();
+        for (const ch of tn.textContent) {
+          const span = document.createElement("span");
+          span.textContent = ch;
+          span.style.opacity = "0";
+          span.style.transition = "opacity 0.25s ease";
+          frag.appendChild(span);
+          spans.push(span);
+        }
+        tn.parentNode.replaceChild(frag, tn);
+      }
+
+      let idx = 0;
+      function revealNext() {
+        if (idx >= spans.length) {
+          setTimeout(() => { bioEl.innerHTML = original; }, 300);
+          return;
+        }
+        spans[idx].style.opacity = "1";
+        idx++;
+        const ch = spans[idx - 1].textContent;
+        const delay = /[.,!?]/.test(ch) ? 30 : /\s/.test(ch) ? 20 : 14;
+        setTimeout(revealNext, delay);
+      }
+      setTimeout(revealNext, 200);
+    }
+  }
 })();
 </script>
 </body>
