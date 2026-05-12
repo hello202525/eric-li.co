@@ -2120,13 +2120,22 @@ void main(){
   float planetR = 0.34 * min(aspect, 1.0);
   float tendrilR = 0.47 * min(aspect, 1.0);
 
-  vec4 state = texture(u_state, uv);
+  // rotate sampling UVs to give visual rotation
+  float rotAngle = u_time * 0.06;
+  vec2 rotUV = uv - vec2(0.5);
+  rotUV = vec2(rotUV.x * cos(rotAngle) - rotUV.y * sin(rotAngle),
+               rotUV.x * sin(rotAngle) + rotUV.y * cos(rotAngle));
+  // blend rotation: full inside planet, none outside (tendrils stay grounded)
+  float rotBlend = smoothstep(planetR, planetR * 0.5, dist);
+  vec2 sampleUV = mix(uv, rotUV + vec2(0.5), rotBlend);
+
+  vec4 state = texture(u_state, sampleUV);
 
   // magma texture: multi-octave noise distorts the UV lookup
-  vec2 texUV = uv;
-  float n1 = vnoise(uv * 8.0 + u_time * 0.04);
-  float n2 = vnoise(uv * 16.0 - u_time * 0.03 + 3.7);
-  float n3 = vnoise(uv * 32.0 + u_time * 0.02 + 7.1);
+  vec2 texUV = sampleUV;
+  float n1 = vnoise(sampleUV * 8.0 + u_time * 0.04);
+  float n2 = vnoise(sampleUV * 16.0 - u_time * 0.03 + 3.7);
+  float n3 = vnoise(sampleUV * 32.0 + u_time * 0.02 + 7.1);
   texUV += vec2(n1 - 0.5, n2 - 0.5) * 0.015;
   vec4 texState = texture(u_state, texUV);
 
