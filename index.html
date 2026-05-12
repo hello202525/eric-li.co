@@ -1076,7 +1076,7 @@
     let cFlash = 0;
 
     // ===== DRIFT WORLD (zero-g) =====
-    const DRIFT_DUR = 50;
+    const DRIFT_DUR = 30;
     const cx = W / 2, cy = H / 2;
 
     const farStars = [];
@@ -1562,19 +1562,20 @@
 
       const progress = Math.min(1, driftZ / DRIFT_DUR);
 
-      // zone colors
+      // zone colors — visible shifts
       let bgR, bgG, bgB;
       if (progress < 0.25) {
         const t = progress / 0.25;
-        bgR = 3 + t * 2; bgG = 2 + t; bgB = 4 + t * 2;
+        bgR = 8 + t * 6; bgG = 3 + t * 2; bgB = 4 + t * 3;
       } else if (progress < 0.55) {
-        bgR = 5; bgG = 3; bgB = 6;
+        const t = (progress - 0.25) / 0.3;
+        bgR = 14 - t * 8; bgG = 5 - t * 2; bgB = 7 - t * 2;
       } else if (progress < 0.85) {
         const t = (progress - 0.55) / 0.3;
-        bgR = 5 - t * 2; bgG = 3 - t; bgB = 6 + t * 3;
+        bgR = 6 - t * 3; bgG = 3 + t * 2; bgB = 5 + t * 10;
       } else {
         const t = (progress - 0.85) / 0.15;
-        bgR = 3 + t * 2; bgG = 2 + t * 3; bgB = 9 + t * 6;
+        bgR = 3 + t * 4; bgG = 5 + t * 6; bgB = 15 + t * 12;
       }
       ctx.fillStyle = "rgb(" + Math.floor(bgR) + "," + Math.floor(bgG) + "," + Math.floor(bgB) + ")";
       ctx.fillRect(0, 0, W, H);
@@ -1588,8 +1589,10 @@
         const sy = cy + (s.y - P.y * 0.05) * sc;
         if (sx < -10 || sx > W + 10 || sy < -10 || sy > H + 10) continue;
         const tw = 0.15 + 0.85 * Math.sin(s.tw + phaseT * 0.2);
-        const bright = tw * (0.2 + (1 - Math.min(1, wz / 8)) * 0.15);
-        ctx.fillStyle = "rgba(228,226,218," + bright + ")";
+        const depthB = 1 - Math.min(1, wz / 8);
+        const voidBoost = (progress > 0.5 && progress < 0.88) ? 1.6 : 1;
+        const bright = tw * (0.25 + depthB * 0.3) * voidBoost;
+        ctx.fillStyle = "rgba(228,226,218," + Math.min(0.9, bright) + ")";
         ctx.beginPath(); ctx.arc(sx, sy, s.r * Math.min(1.5, sc * 0.08), 0, 6.28); ctx.fill();
       }
 
@@ -1608,17 +1611,18 @@
       // --- NEBULA WASH (appears in void zone) ---
       if (progress > 0.45 && progress < 0.9) {
         const nI = progress < 0.55 ? (progress - 0.45) / 0.1 : progress > 0.8 ? (0.9 - progress) / 0.1 : 1;
-        const nA = nI * 0.04;
-        const nG = ctx.createRadialGradient(W * 0.3 - P.x * 20, H * 0.35 - P.y * 20, 0, W * 0.3, H * 0.35, W * 0.45);
-        nG.addColorStop(0, "rgba(40,20,80," + nA + ")");
-        nG.addColorStop(0.5, "rgba(20,15,60," + (nA * 0.5) + ")");
-        nG.addColorStop(1, "rgba(10,8,30,0)");
+        const nA = nI * 0.07;
+        const nG = ctx.createRadialGradient(W * 0.3 - P.x * 20, H * 0.35 - P.y * 20, 0, W * 0.3, H * 0.35, W * 0.5);
+        nG.addColorStop(0, "rgba(50,25,90," + nA + ")");
+        nG.addColorStop(0.4, "rgba(25,18,70," + (nA * 0.5) + ")");
+        nG.addColorStop(1, "rgba(10,8,35,0)");
         ctx.fillStyle = nG;
         ctx.fillRect(0, 0, W, H);
       }
 
       // --- DEBRIS + ASTEROIDS (projected from 3D) ---
       const FOV = 200;
+      let closeShake = 0;
       const drawObjs = [];
       for (const d of debris) {
         const relZ = d.z - (driftZ % 48);
@@ -1626,8 +1630,11 @@
         if (wz > 20) continue;
         const zoneP = d.zone;
         let visible = true;
-        if (zoneP < 0.3 && progress > 0.45) visible = false;
-        if (zoneP > 0.6 && progress < 0.2) visible = false;
+        if (zoneP < 0.3 && progress > 0.4) visible = false;
+        if (zoneP >= 0.3 && zoneP < 0.6 && progress > 0.55) visible = false;
+        if (zoneP >= 0.6 && progress < 0.2) visible = false;
+        if (zoneP >= 0.6 && progress > 0.5) visible = false;
+        if (progress > 0.55 && progress < 0.85 && zoneP > 0.08) visible = false;
         if (!visible) continue;
         drawObjs.push({ o: d, wz, type: "debris" });
       }
@@ -1691,8 +1698,10 @@
           const objSz = cp.sz * sc2 * 0.05;
           if (objSz < 2) continue;
 
-          const a = Math.min(0.7, objSz / 300);
-          ctx.fillStyle = "rgba(8,6,5," + a + ")";
+          if (wz < 2) closeShake = Math.max(closeShake, (2 - wz) / 2);
+
+          const a = Math.min(0.75, objSz / 250);
+          ctx.fillStyle = "rgba(6,5,4," + a + ")";
           ctx.beginPath();
           const rot = phaseT * 0.1 + cp.seed;
           for (let v = 0; v < cp.nv; v++) {
@@ -1703,6 +1712,11 @@
             v === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
           }
           ctx.closePath(); ctx.fill();
+
+          if (wz < 3 && objSz > 30) {
+            ctx.fillStyle = "rgba(6,5,4," + (a * 0.15) + ")";
+            ctx.fillRect(0, 0, W, H);
+          }
         }
       }
 
@@ -1733,11 +1747,11 @@
       }
 
       // --- PALE BLUE DOT (Earth) ---
-      if (progress > 0.82) {
-        const earthI = (progress - 0.82) / 0.18;
-        const earthR = 1 + earthI * 4;
-        const earthA = earthI * 0.8;
-        const earthGlow = earthI * 0.06;
+      if (progress > 0.75) {
+        const earthI = (progress - 0.75) / 0.25;
+        const earthR = 0.5 + earthI * 5;
+        const earthA = Math.min(0.9, earthI * 1.1);
+        const earthGlow = earthI * 0.09;
         const ex = cx + P.x * 5, ey = cy * 0.6 + P.y * 5;
 
         if (earthGlow > 0.005) {
@@ -1758,6 +1772,13 @@
 
       // --- POST-PROCESSING ---
 
+      // close-pass screen shake
+      if (closeShake > 0.01) {
+        const shMag = closeShake * 6;
+        ctx.save();
+        ctx.translate((Math.random() - 0.5) * shMag, (Math.random() - 0.5) * shMag);
+      }
+
       // vignette
       const vig = ctx.createRadialGradient(cx, cy, W * 0.2, cx, cy, W * 0.75);
       vig.addColorStop(0, "rgba(0,0,0,0)");
@@ -1772,6 +1793,8 @@
         ctx.fillRect(Math.random() * W, Math.random() * H, 1, 1);
       }
       ctx.globalAlpha = 1;
+
+      if (closeShake > 0.01) ctx.restore();
 
       // fade-in from black
       if (phaseT < 2.5) {
